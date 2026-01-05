@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Limpiador de App</title>
+</head>
+<body>
+    <h1>🧹 Limpiando la App...</h1>
+    <p>Por favor, espera...</p>
+    <script>
+        // 1. Matar todos los Service Workers
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) {
+                registration.unregister()
+                .then(function() { console.log('Service Worker eliminado'); });
+            } 
+        });
+
+        // 2. Borrar toda la memoria caché
+        caches.keys().then(function(names) {
+            for (let name of names) {
+                caches.delete(name);
+            }
+        });
+
+        // 3. Aviso final
+        setTimeout(function(){
+            document.body.innerHTML = "<h1>✅ ¡LIMPIEZA COMPLETADA!</h1><p>Ahora cierra esta pestaña, cierra el navegador completamente y vuelve a entrar en la App normal.";
+            alert("¡Ya está limpio! Ahora debería funcionar.");
+        }, 2000);
+    </script>
+</body>
+</html>
