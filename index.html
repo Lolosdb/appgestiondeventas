@@ -16,16 +16,7 @@
         /* --- ESTILOS QUIRÚRGICOS --- */
 
         /* 1. Contador de pedidos (Limpio y profesional) */
-        .contador-pedidos-extra {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            margin-top: 4px;
-            color: #64748b;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
+        /* 1. Contador de pedidos (ELIMINADO POR PETICION) */
 
         /* 2. Arreglo Símbolo Euro en Menú */
         .euro-menu-fix {
@@ -39,7 +30,7 @@
         .texto-ventas {
             text-transform: uppercase !important;
             font-weight: 700 !important;
-            color: #3b82f6 !important;
+            color: #ffffff !important;
         }
 
         /* 4. Fechas (Ficha Cliente) */
@@ -58,87 +49,12 @@
 
     <script>
         // ==========================================
-        // 1. CÁLCULO DE PEDIDOS (Lógica Reforzada)
         // ==========================================
-        let hasLoggedDebug = false;
+        // 1. CÁLCULO DE PEDIDOS (ELIMINADO)
+        // ==========================================
         function contarPedidos() {
-            const resultado = { 'ASTURIAS': 0, 'CANTABRIA': 0, 'LEON': 0, 'GALICIA': 0 };
-            try {
-                const raw = localStorage.getItem('ventas-storage');
-                if (!raw) {
-                    if (!hasLoggedDebug) {
-                        console.log('DEBUG: No ventas-storage found');
-                        console.log('DEBUG: Available keys:', Object.keys(localStorage));
-                        hasLoggedDebug = true;
-                    }
-                    return resultado;
-                }
-
-                const db = JSON.parse(raw);
-                if (!db.orders) {
-                    if (!hasLoggedDebug) {
-                        console.log('DEBUG: No orders in db');
-                        hasLoggedDebug = true;
-                    }
-                    return resultado;
-                }
-
-                const anio = localStorage.getItem('selectedYear') || new Date().getFullYear().toString();
-                if (!hasLoggedDebug) console.log('DEBUG: Año seleccionado:', anio);
-
-                // --- MAPEO DE CLIENTES (Nombre y Código) ---
-                const mapaClientes = {};
-                if (db.clients) {
-                    db.clients.forEach(c => {
-                        // Datos del cliente
-                        const prov = c.province || c.provincia || c.Provincia || c.region;
-
-                        if (prov) {
-                            const provinciaNorm = prov.trim().toUpperCase();
-
-                            // Mapeamos por NOMBRE
-                            if (c.name) mapaClientes[c.name.trim().toUpperCase()] = provinciaNorm;
-                            if (c.nombre) mapaClientes[c.nombre.trim().toUpperCase()] = provinciaNorm;
-                            if (c.razonSocial) mapaClientes[c.razonSocial.trim().toUpperCase()] = provinciaNorm;
-
-                            // Mapeamos por CÓDIGO
-                            if (c.code) mapaClientes[String(c.code).trim()] = provinciaNorm;
-                            if (c.id) mapaClientes[String(c.id).trim()] = provinciaNorm;
-                            if (c.codigo) mapaClientes[String(c.codigo).trim()] = provinciaNorm;
-                        }
-                    });
-                }
-                if (!hasLoggedDebug) console.log('DEBUG: Mapa Clientes size:', Object.keys(mapaClientes).length);
-
-                // --- CONTEO ---
-                let ordersProcessed = 0;
-                db.orders.forEach(o => {
-                    if (o.date && String(o.date).startsWith(anio)) {
-                        ordersProcessed++;
-                        let prov = null;
-
-                        if (o.clientName) prov = mapaClientes[o.clientName.trim().toUpperCase()];
-                        if (!prov && o.clientId) prov = mapaClientes[String(o.clientId).trim()];
-                        if (!prov && o.clientCode) prov = mapaClientes[String(o.clientCode).trim()];
-
-                        if (prov) {
-                            if (prov.includes('ASTURIAS')) resultado['ASTURIAS']++;
-                            else if (prov.includes('CANTABRIA')) resultado['CANTABRIA']++;
-                            else if (prov.includes('LEON') || prov.includes('LEÓN')) resultado['LEON']++;
-                            else if (['LUGO', 'ORENSE', 'PONTEVEDRA', 'CORUÑA', 'A CORUÑA', 'A CORUNA'].some(x => prov.includes(x))) resultado['GALICIA']++;
-                        } else {
-                            if (!hasLoggedDebug && ordersProcessed < 5) console.log('DEBUG: Prov not found for order:', o);
-                        }
-                    }
-                });
-                if (!hasLoggedDebug) {
-                    console.log('DEBUG: Orders processed for year', anio, ':', ordersProcessed);
-                    console.log('DEBUG: Resultado conteo:', resultado);
-                    hasLoggedDebug = true;
-                }
-
-            } catch (e) { console.error("Error contadores:", e); }
-            return resultado;
+            // Función eliminada para limpiar la UI
+            return {};
         }
 
         // ==========================================
@@ -209,55 +125,9 @@
                 });
             }
 
-            // --- B. CONTADORES DE PEDIDOS ---
-            const contadores = contarPedidos();
-            const zonas = ['ASTURIAS', 'CANTABRIA', 'LEON', 'LEÓN', 'GALICIA'];
-
-            document.querySelectorAll('h3, span, div, p').forEach(el => {
-                const texto = el.textContent.trim().toUpperCase();
-                if (zonas.includes(texto)) {
-                    // Buscar tarjeta padre
-                    let tarjeta = el.parentElement;
-                    let encontrada = false;
-                    for (let i = 0; i < 5; i++) {
-                        if (!tarjeta) break;
-                        const s = window.getComputedStyle(tarjeta);
-                        // Detectar tarjeta blanca
-                        if (s.backgroundColor.includes('255, 255, 255') || s.boxShadow !== 'none') {
-                            encontrada = true;
-                            break;
-                        }
-                        tarjeta = tarjeta.parentElement;
-                    }
-
-                    if (encontrada && tarjeta) {
-                        const key = (texto === 'LEÓN') ? 'LEON' : texto;
-                        const num = contadores[key];
-
-                        // 1. Ordenar Precio (debajo del título)
-                        const precio = Array.from(tarjeta.querySelectorAll('*')).find(x => x.textContent.includes('€') && x !== tarjeta);
-                        if (precio && el.nextElementSibling !== precio) {
-                            el.after(precio);
-                            precio.style.display = 'block';
-                            precio.style.marginBottom = '4px';
-                        }
-
-                        // 2. Inyectar Contador (Debajo del precio si existe)
-                        let contadorEl = tarjeta.querySelector('.contador-pedidos-extra');
-                        if (!contadorEl) {
-                            contadorEl = document.createElement('div');
-                            contadorEl.className = 'contador-pedidos-extra';
-                            if (precio) precio.after(contadorEl);
-                            else tarjeta.appendChild(contadorEl);
-                        }
-
-                        const textoFinal = `📦 ${num} Pedidos`;
-                        if (contadorEl.textContent !== textoFinal) {
-                            contadorEl.textContent = textoFinal;
-                        }
-                    }
-                }
-            });
+            // --- B. CONTADORES DE PEDIDOS (ELIMINADO) ---
+            // Se ha eliminado la lógica de inyección de contadores por petición del usuario.
+            const contadores = {}; // Placeholder vacío
 
             // --- C. TEXTOS GENERALES ---
             document.querySelectorAll('*').forEach(el => {
@@ -277,6 +147,10 @@
                     }
                     if (t === "HISTÓRICO VENTAS" || el.textContent.trim().toUpperCase() === "HISTÓRICO VENTAS") {
                         el.textContent = "Medias mensuales";
+                    }
+                    // Nuevo: Forzar blanco en cabeceras clave
+                    if (t === "TOTALES" || t === "ULTIMA" || t === "ANUAL") {
+                        el.style.color = '#ffffff';
                     }
                 }
             });
@@ -306,6 +180,96 @@
                     }
                 }
             });
+
+            // --- F. CABECERA SUPERIOR (GENERICA - TODAS LAS VENTANAS) ---
+            // Detectar textos en la barra superior (Top < 65px) y forzarlos a blanco
+            document.querySelectorAll('div, span, h1, h2, h3, h4, h5, h6, a, p').forEach(el => {
+                // Solo elementos hoja (sin hijos) con texto
+                if (el.children.length === 0 && el.textContent.trim().length > 0) {
+                    const rect = el.getBoundingClientRect();
+                    // Si está en la zona visual del header (aprox 65px alto)
+                    if (rect.top >= 0 && rect.bottom <= 65) {
+                        // Verificar que no sea transparente (oculto)
+                        if (rect.width > 0 && rect.height > 0) {
+                            // Forzar blanco (con !important para vencer framework CSS)
+                            el.style.setProperty('color', '#ffffff', 'important');
+                        }
+                    }
+                }
+            });
+
+            // --- G. ORDENAR PEDIDOS VISUALMENTE (Fecha DESC, luego Nº DESC) ---
+            try {
+                const headers = Array.from(document.querySelectorAll('div, th, span')).filter(x =>
+                    x.textContent.trim() === 'TIENDA' || x.textContent.trim() === 'IMPORTE'
+                );
+
+                if (headers.length > 0) {
+                    let headerEl = headers[0];
+                    let headerRow = headerEl.parentElement;
+                    while (headerRow && headerRow.parentElement && headerRow.children.length < 2) {
+                        headerRow = headerRow.parentElement;
+                    }
+
+                    if (headerRow && headerRow.parentElement) {
+                        const container = headerRow.parentElement;
+                        let rows = Array.from(container.children).filter(child =>
+                            child !== headerRow &&
+                            child.textContent.trim() !== '' &&
+                            (child.textContent.includes('€') || child.textContent.includes('/')) &&
+                            /\d/.test(child.textContent) // Debe tener números
+                        );
+
+                        if (rows.length > 1) {
+                            // Helper: Parsear Fecha (dd/mm/yy) -> Timestamp
+                            const getDateScore = (row) => {
+                                const text = row.textContent;
+                                const match = text.match(/(\d{2})\/(\d{2})\/(\d{2})/);
+                                if (match) {
+                                    const d = parseInt(match[1]);
+                                    const m = parseInt(match[2]);
+                                    const y = 2000 + parseInt(match[3]);
+                                    return (y * 10000) + (m * 100) + d; // YYYYMMDD
+                                }
+                                return 0;
+                            };
+
+                            // Helper: Parsear ID (Inicio de línea)
+                            const getId = (row) => {
+                                const match = row.textContent.trim().match(/^(\d+)/);
+                                return match ? parseInt(match[1]) : 0;
+                            };
+
+                            let needsSort = false;
+                            for (let i = 0; i < rows.length - 1; i++) {
+                                const scoreA = getDateScore(rows[i]);
+                                const scoreB = getDateScore(rows[i + 1]);
+
+                                if (scoreA < scoreB) { needsSort = true; break; }
+                                if (scoreA === scoreB) {
+                                    const idA = getId(rows[i]);
+                                    const idB = getId(rows[i + 1]);
+                                    if (idA < idB) { needsSort = true; break; }
+                                }
+                            }
+
+                            if (needsSort) {
+                                rows.sort((a, b) => {
+                                    const dateDiff = getDateScore(b) - getDateScore(a);
+                                    if (dateDiff !== 0) return dateDiff;
+                                    return getId(b) - getId(a);
+                                });
+
+                                let currentAnchor = headerRow;
+                                rows.forEach(row => {
+                                    currentAnchor.after(row);
+                                    currentAnchor = row;
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (e) { }
 
         }, 500);
     </script>
