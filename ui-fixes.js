@@ -6,10 +6,35 @@
 (function (window) {
     'use strict';
 
-    console.log('⚡ UI Fixes cargado (MutationObserver)');
+    console.log('⚡ UI Fixes cargado (MutationObserver) - v2 AGRESIVA');
 
     // Estado global de detección
     window.clienteEnEdicionGlobal = null;
+
+    // --- 0. INYECCIÓN DE ESTILOS GLOBALES ---
+    const style = document.createElement('style');
+    style.innerHTML = `
+        /* Bloqueo total del fondo */
+        body.modal-open {
+            overflow: hidden !important;
+            overscroll-behavior: none !important;
+            position: fixed !important; /* Fix supremo para iOS */
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Forzar scroll suave en contenedores */
+        .modal-scroll-force {
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important; /* Importante para iOS */
+            overscroll-behavior: contain !important;
+            max-height: 85vh !important;
+            display: block !important;
+            pointer-events: auto !important;
+        }
+    `;
+    document.head.appendChild(style);
+
 
     // --- 1. CONFIGURACIÓN DEL OBSERVER ---
     const observerConfig = { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] };
@@ -19,7 +44,6 @@
         let checkMapVisibility = false;
 
         for (const mutation of mutations) {
-            // Optimización: Solo verificamos si se añaden nodos o cambian estilos relevantes
             if (mutation.type === 'childList' && mutation.addedNodes.length > 0) checkScrollHelpers = true;
             if (mutation.type === 'attributes') checkMapVisibility = true;
         }
@@ -28,7 +52,6 @@
             if (checkScrollHelpers) aplicarCorreccionesUI();
             if (checkMapVisibility) gestionarVisibilidadMapa();
 
-            // Siempre verificar reparaciones y botón flotante en cambios de DOM
             gestionarBotonReparar();
             detectarClienteEnPantalla();
         });
@@ -37,57 +60,65 @@
     // --- 2. FUNCIONES DE CORRECCIÓN ---
 
     function aplicarCorreccionesUI() {
-        // A. SCROLL MODAL EDITAR PEDIDO
-        // Buscamos textos que digan "Editar Pedido"
-        const titulos = Array.from(document.querySelectorAll('h1, h2, h3, div, span')).filter(el =>
-            el.textContent && el.textContent.trim() === "Editar Pedido"
-        );
+        // A. SCROLL MODAL EDITAR PEDIDO (DETECCIÓN FLEXIBLE)
+        // Buscamos contenedores que parezcan el modal
+        const posiblesTitulos = Array.from(document.querySelectorAll('h1, h2, h3, div, span')).filter(el => {
+            if (!el.textContent) return false;
+            const txt = el.textContent.trim().toLowerCase();
+            return txt.includes('editar pedido') || txt.includes('editar cliente');
+        });
 
-        if (titulos.length > 0) {
-            // BLOQUEAR SCROLL DEL BODY (Para que el fondo no se mueva)
-            if (document.body.style.overflow !== 'hidden') {
-                document.body.style.setProperty('overflow', 'hidden', 'important');
+        // Filtrar solo los que son visibles
+        const titulosVisibles = posiblesTitulos.filter(el => el.offsetParent !== null);
+
+        if (titulosVisibles.length > 0) {
+            // ACTIVAR BLOQUEO DE FONDO
+            if (!document.body.classList.contains('modal-open')) {
+                document.body.classList.add('modal-open');
+                console.log('🔒 Modal detectado: Scroll de fondo BLOQUEADO');
             }
         } else {
-            // RESTAURAR SCROLL SI NO ESTÁ EL MODAL Y NO ESTÁ EL MAPA
+            // DESACTIVAR BLOQUEO si no hay modal (y no está el mapa)
             const visorMap = document.getElementById('visor-mapa-myl');
-            if (document.body.style.overflow === 'hidden' && (!visorMap || visorMap.style.display === 'none')) {
+            const mapaVisible = visorMap && visorMap.style.display !== 'none';
+
+            if (!mapaVisible && document.body.classList.contains('modal-open')) {
+                document.body.classList.remove('modal-open');
+                // Limpiar styles inline por si acaso quedaron
                 document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('position');
+                console.log('🔓 Modal cerrado: Scroll restaurado');
             }
         }
 
-        titulos.forEach(el => {
-            // 1. Asegurar contenedor padre (bloqueo oscuro) con scroll
-            let wrapper = el.closest('div[style*="position: fixed"]') || el.closest('div[style*="z-index"]');
-            if (wrapper) {
-                // Asegurar que el overlay ocupe todo
-                if (wrapper.style.height !== '100%') wrapper.style.setProperty('height', '100%', 'important');
+        titulosVisibles.forEach(el => {
+            // 1. BUSCAR EL WRAPPER (EL CONTENEDOR OSCURO/FIXED)
+            // Buscamos hacia arriba un padre que tenga position fixed o absolute y cubra la pantalla
+            let wrapper = el.parentElement;
+            let foundWrapper = null;
 
-                // Habilitar scroll en el wrapper
-                if (wrapper.style.overflowY !== 'auto') {
-                    wrapper.style.setProperty('overflow-y', 'auto', 'important');
-                    wrapper.style.setProperty('padding-bottom', '80px', 'important');
-                    wrapper.style.setProperty('overscroll-behavior', 'contain', 'important');
+            while (wrapper && wrapper.tagName !== 'BODY') {
+                const s = window.getComputedStyle(wrapper);
+                if (s.position === 'fixed' || s.position === 'absolute' || parseInt(s.zIndex) > 100) {
+                    // Candidato a wrapper
+                    foundWrapper = wrapper;
                 }
+                // Si encontramos la tarjeta blanca en el camino, la marcamos
+                if (s.backgroundColor === 'rgb(255, 255, 255)' || s.backgroundColor === '#ffffff' || s.backgroundColor === 'white') {
+                    if (!wrapper.classList.contains('modal-scroll-force')) {
+                        wrapper.classList.add('modal-scroll-force'); // Aplicar clase CSS fuerza bruta
+                        // Asegurar padding para que el botón de guardar se vea
+                        wrapper.style.setProperty('padding-bottom', '100px', 'important');
+                    }
+                }
+                wrapper = wrapper.parentElement;
             }
 
-            // 2. Buscar tarjeta blanca y darle altura max
-            let p = el.parentElement;
-            let tarjetaEncontrada = false;
-            while (p && p.tagName !== 'BODY' && !tarjetaEncontrada) {
-                try {
-                    const s = window.getComputedStyle(p);
-                    if (s.backgroundColor === 'rgb(255, 255, 255)' || s.backgroundColor === '#ffffff' || s.backgroundColor === 'white') {
-                        if (p.style.maxHeight !== '85vh') {
-                            p.style.setProperty('max-height', '85vh', 'important');
-                            p.style.setProperty('overflow-y', 'auto', 'important');
-                            p.style.setProperty('display', 'block', 'important');
-                            p.style.setProperty('overscroll-behavior', 'contain', 'important');
-                        }
-                        tarjetaEncontrada = true;
-                    }
-                } catch (e) { }
-                p = p.parentElement;
+            // Si encontramos un wrapper padre (el overlay oscuro), aseguramos que ocupe todo
+            if (foundWrapper) {
+                foundWrapper.style.setProperty('height', '100%', 'important');
+                foundWrapper.style.setProperty('overflow-y', 'auto', 'important'); // El overlay debe scrollear
+                foundWrapper.style.setProperty('-webkit-overflow-scrolling', 'touch', 'important');
             }
         });
 
@@ -98,7 +129,7 @@
             }
         });
 
-        // C. Z-INDEX FIX (Elementos pegados al fondo que tapan cosas)
+        // C. Z-INDEX FIX
         document.querySelectorAll('div').forEach(d => {
             if (d.style.position === 'fixed' && d.style.bottom === '0px' && d.style.zIndex !== "9999") {
                 const r = d.getBoundingClientRect();
@@ -112,11 +143,8 @@
 
     function gestionarVisibilidadMapa() {
         let mapaActivo = false;
-
-        // Detección por URL
         if (window.location.href.includes('/map')) mapaActivo = true;
 
-        // Detección por botones activos en la navbar
         document.querySelectorAll('a, div, span, p').forEach(el => {
             const txt = el.textContent ? el.textContent.trim().toLowerCase() : '';
             if (txt === 'mapa' || txt === 'map') {
@@ -128,48 +156,42 @@
         });
 
         const visorMyl = document.getElementById('visor-mapa-myl');
-        const visorOld = document.getElementById('visor-mapa'); // Por compatibilidad si quedase
+        const visorOld = document.getElementById('visor-mapa');
 
         if (mapaActivo) {
-            // Prioridad al mapa nuevo
+            if (!document.body.classList.contains('modal-open')) document.body.classList.add('modal-open'); // Bloquear scroll body tb
+
             if (visorMyl && visorMyl.style.display !== 'block') {
                 visorMyl.style.display = 'block';
-                document.body.style.overflow = 'hidden';
-                if (window.initMap) window.initMap(); // De mapa-myl.js
+                if (window.initMap) window.initMap();
             } else if (visorOld && (!visorMyl || visorMyl.style.display === 'none')) {
-                // Fallback a mapa viejo si existiese
                 visorOld.style.display = 'block';
-                document.body.style.overflow = 'hidden';
             }
         } else {
-            // Ocultar todo
-            if (visorMyl && visorMyl.style.display !== 'none') {
-                visorMyl.style.display = 'none';
-                document.body.style.overflow = 'auto';
+            // Solo desbloquear si no hay modal de edición abierto
+            const titulos = Array.from(document.querySelectorAll('h1, h2, h3')).filter(el =>
+                el.textContent && (el.textContent.includes('Editar Pedido') || el.textContent.includes('Editar Cliente'))
+            );
+            if (titulos.length === 0 && document.body.classList.contains('modal-open')) {
+                document.body.classList.remove('modal-open');
             }
-            if (visorOld && visorOld.style.display !== 'none') {
-                visorOld.style.display = 'none';
-                document.body.style.overflow = 'auto';
-            }
+
+            if (visorMyl && visorMyl.style.display !== 'none') visorMyl.style.display = 'none';
+            if (visorOld && visorOld.style.display !== 'none') visorOld.style.display = 'none';
         }
     }
 
     function gestionarBotonReparar() {
-        // Busca el botón "Seleccionar Archivo" original de la app para inyectarle al lado el botón reparar
         const botonesTexto = document.querySelectorAll('div, button, label, span');
         let botonOriginal = null;
-
-        // Búsqueda del ancla
         for (const el of botonesTexto) {
             if (el.textContent && el.textContent.trim() === "Seleccionar Archivo" && el.offsetParent !== null) {
                 botonOriginal = el;
                 break;
             }
         }
-
         if (botonOriginal) {
             let contenedor = botonOriginal.parentElement;
-            // Subir hasta encontrar un contenedor decente
             let depth = 0;
             while (contenedor && contenedor.tagName !== 'DIV' && !contenedor.className.includes('card') && depth < 3) {
                 contenedor = contenedor.parentElement;
@@ -181,7 +203,6 @@
                 const btn = document.createElement('div');
                 btn.id = 'btn-reparar-inyectado';
                 btn.innerHTML = '🛠️ REPARAR FICHA BLANCA';
-                // Estilos básicos por si CSS falla
                 btn.style.cssText = "width:100%; padding:12px; margin-top:15px; border-radius:8px; cursor:pointer; font-weight:bold; background:#f97316; color:white; text-align:center;";
                 btn.onclick = function () {
                     if (window.repararBaseDatos) window.repararBaseDatos();
@@ -195,24 +216,19 @@
     function detectarClienteEnPantalla() {
         const btn = document.getElementById('btn-editar-flotante');
         if (!btn) return;
-
-        // Si el mapa está visible, ocultar lápiz
         const visor = document.getElementById('visor-mapa-myl');
         if (visor && visor.style.display === 'block') {
             btn.style.display = 'none';
             return;
         }
 
-        // Buscar títulos grandes que parezcan nombres de clientes
         const titulos = document.querySelectorAll('h1, h2, h3, div[class*="title"], span[class*="title"]');
-        const clientes = JSON.parse(localStorage.getItem('clients') || '[]'); // TODO: Optimizar lectura?
-        // Nota: Leemos localStorage aquí porque puede cambiar. Se podría optimizar con cache pero es riesgoso si cambia fuera.
+        const clientes = JSON.parse(localStorage.getItem('clients') || '[]');
 
         let encontrado = null;
         for (let el of titulos) {
             const texto = el.textContent ? el.textContent.trim().toUpperCase() : "";
             if (texto.length > 3) {
-                // Búsqueda exacta primero
                 const match = clientes.find(c => (c.name || "").toUpperCase() === texto);
                 if (match) { encontrado = match; break; }
             }
@@ -220,7 +236,7 @@
 
         if (encontrado) {
             btn.style.display = 'flex';
-            window.clienteEnEdicionGlobal = encontrado; // Exportar para data-manager
+            window.clienteEnEdicionGlobal = encontrado;
         } else {
             btn.style.display = 'none';
             window.clienteEnEdicionGlobal = null;
@@ -228,28 +244,14 @@
     }
 
     // --- 3. INICIALIZACIÓN ---
-
-    // Iniciar Observer
     observer.observe(document.body, observerConfig);
 
-    // Inyección inicial HTML (Botón Flotante)
     if (!document.getElementById('btn-editar-flotante')) {
         const btn = document.createElement('div');
         btn.id = 'btn-editar-flotante';
         btn.innerHTML = '✏️';
-        btn.onclick = () => {
-            if (window.abrirEditor) window.abrirEditor();
-        };
+        btn.onclick = () => { if (window.abrirEditor) window.abrirEditor(); };
         document.body.appendChild(btn);
-    }
-
-    // Inyección inicial HTML (Modal Editor - Skeleton básico si no existe)
-    if (!document.getElementById('modal-editor')) {
-        // Nota: Idealmente el modal debería estar en el HTML estático, pero si no está, lo creamos
-        // Para esta refactorización asumimos que el HTML del modal sigue en index.html o se inyectó dinámicamente.
-        // Si se borra de index.html, aquí es donde deberíamos recrearlo. 
-        // Verificaremos si el usuario quiere mantenerlo en index.html o moverlo aquí.
-        // Por ahora confiamos en que index.html lo tenga.
     }
 
 })(window);
