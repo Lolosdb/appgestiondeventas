@@ -1,12 +1,12 @@
 /**
- * UI FIXES - v7 ESTABILIDAD TOTAL
- * Soluciona el scroll del modal y asegura la visibilidad de la app.
+ * UI FIXES - v8 SCROLL FIX
+ * Soluciona el scroll del modal y habilita el scroll en las vistas principales (Dash, Pedidos, Clientes).
  */
 
 (function (window) {
     'use strict';
 
-    console.log('⚡ UI Fixes v7 - Estabilizando App...');
+    console.log('⚡ UI Fixes v8 - Habilitando scroll en vistas principales...');
 
     // 1. Inyectamos estilos ULTRA-AGRESIVOS para el scroll
     const style = document.createElement('style');
@@ -17,7 +17,40 @@
             touch-action: none !important;
         }
 
-        /* Forzar scroll en cualquier tarjeta blanca o gris claro (slate-50) */
+        /* HABILITAR SCROLL EN VISTAS PRINCIPALES */
+        /* Asegurar que el body tenga scroll cuando sea necesario */
+        body {
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+            position: relative !important;
+        }
+
+        /* Contenedor principal de la aplicación */
+        #root {
+            min-height: 100vh !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+
+        /* Contenedores principales de las vistas que necesitan scroll */
+        #root > div:not([class*="fixed"]):not([style*="fixed"]),
+        #root > div > div:not([class*="fixed"]):not([style*="fixed"]) {
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+
+        /* Áreas de contenido blanco que necesitan scroll */
+        div.bg-white:not([class*="fixed"]):not([style*="fixed"]):not([style*="absolute"]),
+        div[class*="bg-slate-50"]:not([class*="fixed"]):not([style*="fixed"]):not([style*="absolute"]) {
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+
+        /* Forzar scroll en cualquier tarjeta blanca o gris claro (slate-50) dentro de fixed */
         div[style*="fixed"] div.bg-white, 
         div.fixed div.bg-white,
         div.fixed div[class*="bg-slate-50"],
@@ -52,7 +85,40 @@
     `;
     document.head.appendChild(style);
 
-    // 2. Detección simplificada de modales
+    // 2. Función para habilitar scroll en contenedores principales
+    function habilitarScrollVistas() {
+        // Buscar contenedores principales que necesitan scroll
+        const root = document.getElementById('root');
+        if (!root) return;
+
+        // Buscar todos los contenedores que podrían necesitar scroll
+        const contenedores = root.querySelectorAll('div');
+        
+        contenedores.forEach(cont => {
+            const style = window.getComputedStyle(cont);
+            const tieneBgBlanco = cont.classList.contains('bg-white') || 
+                                 cont.classList.contains('bg-slate-50') ||
+                                 style.backgroundColor.includes('255') ||
+                                 style.backgroundColor.includes('rgb(255');
+            
+            const esFixed = style.position === 'fixed' || style.position === 'absolute';
+            const tieneOverflowHidden = style.overflow === 'hidden' || style.overflowY === 'hidden';
+            
+            // Si es un contenedor de contenido principal (no fixed/absolute) y tiene overflow hidden
+            if (tieneBgBlanco && !esFixed && tieneOverflowHidden) {
+                cont.style.overflowY = 'auto';
+                cont.style.overflowX = 'hidden';
+                cont.style.webkitOverflowScrolling = 'touch';
+            }
+        });
+
+        // Asegurar que el body tenga scroll habilitado
+        if (document.body.style.overflowY === 'hidden') {
+            document.body.style.overflowY = 'auto';
+        }
+    }
+
+    // 3. Detección simplificada de modales
     function corregirUI() {
         const titulos = ['editar pedido', 'editar cliente', 'nuevo pedido', 'nuevo cliente', 'detalle pedido'];
         let hayModal = false;
@@ -74,6 +140,9 @@
             document.body.classList.remove('modal-open');
         }
 
+        // Habilitar scroll en vistas principales
+        habilitarScrollVistas();
+        
         gestionarMapa();
         detectarCliente();
     }
@@ -103,7 +172,7 @@
         if (encontrado) window.clienteEnEdicionGlobal = encontrado;
     }
 
-    // 3. Observer con throttling para no saturar
+    // 4. Observer con throttling para no saturar
     let timeout;
     const observer = new MutationObserver(() => {
         clearTimeout(timeout);
