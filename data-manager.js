@@ -21,6 +21,10 @@
     window.abrirEditor = abrirEditor;
     window.cerrarEditor = cerrarEditor;
 
+    // Asegurar que 'clients' y 'orders' estén disponibles globalmente para el Dash
+    window.clients = JSON.parse(localStorage.getItem('clients') || '[]');
+    window.orders = JSON.parse(localStorage.getItem('orders') || '[]');
+
     let clienteEnEdicion = null;
 
     // --- IMPORTACIÓN DE EXCEL CON NORMALIZACIÓN (Solución "Ficha Blanca") ---
@@ -163,6 +167,9 @@
                 localStorage.setItem('clients', json);
                 localStorage.setItem('clientes', json); // Multi-idioma
                 localStorage.setItem('data_clientes', json); // Posible clave de la app
+
+                // Sincronizar con la variable global que la app busca para renderizar
+                window.clients = clients;
 
                 console.log(`✅ Datos normalizados en múltiples llaves: ${clients.length} clientes.`);
                 if (huboCambios && !silencioso) location.reload();
