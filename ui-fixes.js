@@ -1,196 +1,138 @@
 /**
- * UI FIXES - v8 SCROLL FIX
- * Soluciona el scroll del modal y habilita el scroll en las vistas principales (Dash, Pedidos, Clientes).
+ * UI FIXES - v8 MARTILLO JS (SOLUCIÓN DEFINITIVA)
+ * Fuerza bruta para el scroll del modal, ignorando Tailwind.
  */
 
 (function (window) {
     'use strict';
 
-    console.log('⚡ UI Fixes v8 - Habilitando scroll en vistas principales...');
+    console.log('⚡ UI Fixes v8 - Aplicando Martillo JS...');
 
-    // 1. Inyectamos estilos ULTRA-AGRESIVOS para el scroll
+    // 1. Estilos de respaldo (por si acaso el JS tarda)
     const style = document.createElement('style');
     style.innerHTML = `
-        /* Bloqueo selectivo del fondo */
-        body.modal-open { 
-            overflow: hidden !important; 
-            touch-action: none !important;
-        }
-
-        /* HABILITAR SCROLL EN VISTAS PRINCIPALES */
-        /* Asegurar que el body tenga scroll cuando sea necesario */
-        body {
-            overflow-y: auto !important;
-            overflow-x: hidden !important;
-            -webkit-overflow-scrolling: touch !important;
-            position: relative !important;
-        }
-
-        /* Contenedor principal de la aplicación */
-        #root {
-            min-height: 100vh !important;
-            overflow-y: auto !important;
-            overflow-x: hidden !important;
-            -webkit-overflow-scrolling: touch !important;
-        }
-
-        /* Contenedores principales de las vistas que necesitan scroll */
-        #root > div:not([class*="fixed"]):not([style*="fixed"]),
-        #root > div > div:not([class*="fixed"]):not([style*="fixed"]) {
-            overflow-y: auto !important;
-            overflow-x: hidden !important;
-            -webkit-overflow-scrolling: touch !important;
-        }
-
-        /* Áreas de contenido blanco que necesitan scroll */
-        div.bg-white:not([class*="fixed"]):not([style*="fixed"]):not([style*="absolute"]),
-        div[class*="bg-slate-50"]:not([class*="fixed"]):not([style*="fixed"]):not([style*="absolute"]) {
-            overflow-y: auto !important;
-            overflow-x: hidden !important;
-            -webkit-overflow-scrolling: touch !important;
-        }
-
-        /* Forzar scroll en cualquier tarjeta blanca o gris claro (slate-50) dentro de fixed */
-        div[style*="fixed"] div.bg-white, 
-        div.fixed div.bg-white,
-        div.fixed div[class*="bg-slate-50"],
-        .modal-card,
-        [class*="modal"] [class*="card"] {
-            max-height: 90vh !important;
-            overflow-y: auto !important;
-            -webkit-overflow-scrolling: touch !important;
-            padding-bottom: 0px !important; /* El padding lo maneja el footer */
-            display: flex !important; /* Importante para que el footer no flote mal */
-            flex-direction: column !important;
-        }
-
-        /* Asegurar que el botón flotante no moleste */
-        #btn-editar-flotante {
-            position: fixed;
-            bottom: 100px;
-            right: 20px;
-            background: #2563eb;
-            color: white;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            z-index: 9999;
+        body.modal-open { overflow: hidden !important; touch-action: none !important; }
+        /* Forzamos visibilidad del botón flotante */
+        #btn-edit-float {
+            position: fixed; bottom: 80px; right: 20px;
+            width: 56px; height: 56px; border-radius: 50%;
+            background: #2563eb; color: white;
+            display: none; align-items: center; justify-content: center;
+            font-size: 24px; z-index: 10000; cursor: pointer;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            cursor: pointer;
         }
     `;
     document.head.appendChild(style);
 
-    // 2. Función para habilitar scroll en contenedores principales
-    function habilitarScrollVistas() {
-        // Buscar contenedores principales que necesitan scroll
-        const root = document.getElementById('root');
-        if (!root) return;
+    // 2. FUNCIÓN PRINCIPAL: FUERZA BRUTA A LOS ESTILOS
+    function forzarScrollModal() {
+        // Buscamos cualquier contenedor fijo que parezca un modal
+        const posiblesModales = document.querySelectorAll('div[class*="fixed"], div[style*="fixed"]');
 
-        // Buscar todos los contenedores que podrían necesitar scroll
-        const contenedores = root.querySelectorAll('div');
-        
-        contenedores.forEach(cont => {
-            const style = window.getComputedStyle(cont);
-            const tieneBgBlanco = cont.classList.contains('bg-white') || 
-                                 cont.classList.contains('bg-slate-50') ||
-                                 style.backgroundColor.includes('255') ||
-                                 style.backgroundColor.includes('rgb(255');
-            
-            const esFixed = style.position === 'fixed' || style.position === 'absolute';
-            const tieneOverflowHidden = style.overflow === 'hidden' || style.overflowY === 'hidden';
-            
-            // Si es un contenedor de contenido principal (no fixed/absolute) y tiene overflow hidden
-            if (tieneBgBlanco && !esFixed && tieneOverflowHidden) {
-                cont.style.overflowY = 'auto';
-                cont.style.overflowX = 'hidden';
-                cont.style.webkitOverflowScrolling = 'touch';
-            }
-        });
+        posiblesModales.forEach(modal => {
+            // Descartamos si no es visible
+            if (window.getComputedStyle(modal).display === 'none') return;
+            if (modal.id === 'btn-edit-float') return; // Ignorar nuestro botón
 
-        // Asegurar que el body tenga scroll habilitado
-        if (document.body.style.overflowY === 'hidden') {
-            document.body.style.overflowY = 'auto';
-        }
-    }
+            // Buscamos la TARJETA del contenido (blanca o gris clara)
+            // Esta es la clave: el modal tiene un fondo oscuro, y dentro hay una tarjeta clara.
+            const tarjeta = modal.querySelector('div[class*="bg-white"], div[class*="bg-slate-50"]');
 
-    // 3. Detección simplificada de modales
-    function corregirUI() {
-        const titulos = ['editar pedido', 'editar cliente', 'nuevo pedido', 'nuevo cliente', 'detalle pedido'];
-        let hayModal = false;
+            if (tarjeta) {
+                // ¡LA ENCONTRAMOS! APLICAR MARTILLO
 
-        // Buscamos textos de títulos de modal
-        document.querySelectorAll('h1, h2, h3, span, strong, div').forEach(el => {
-            const txt = (el.innerText || el.textContent || "").trim().toLowerCase();
-            if (titulos.includes(txt)) {
-                // Si el elemento es visible, marcamos que hay modal
-                if (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none') {
-                    hayModal = true;
+                // 1. Restringir altura de la tarjeta para que quepa en pantalla
+                tarjeta.style.setProperty('max-height', '85vh', 'important');
+                tarjeta.style.setProperty('height', 'auto', 'important');
+                tarjeta.style.setProperty('display', 'flex', 'important');
+                tarjeta.style.setProperty('flex-direction', 'column', 'important');
+                tarjeta.style.setProperty('overflow', 'hidden', 'important'); // El scroll va DENTRO
+
+                // 2. Buscar el contenedor SCROLLABLE dentro de la tarjeta
+                // Normalmente es el que tiene más texto o inputs
+                const scrollable = Array.from(tarjeta.children).find(child => {
+                    const h = window.getComputedStyle(child).height;
+                    return child.querySelectorAll('input, select, p').length > 0;
+                });
+
+                if (scrollable) {
+                    scrollable.style.setProperty('overflow-y', 'auto', 'important');
+                    scrollable.style.setProperty('flex', '1', 'important'); // Ocupar espacio disponible
+                    scrollable.style.setProperty('max-height', 'none', 'important'); // Quitar límites internos
+                }
+
+                // 3. Bloquear scroll del body
+                document.body.classList.add('modal-open');
+
+                // Marcamos como procesado para debug
+                if (!tarjeta.dataset.fixed) {
+                    console.log('🔨 Martillo JS aplicado a modal:', tarjeta);
+                    tarjeta.dataset.fixed = "true";
                 }
             }
         });
 
-        if (hayModal) {
-            document.body.classList.add('modal-open');
-        } else {
+        // Si no detectamos modal activo, liberamos body
+        const hayModal = document.querySelector('.modal-open');
+        if (!posiblesModales.length && hayModal) {
             document.body.classList.remove('modal-open');
         }
 
-        // Habilitar scroll en vistas principales
-        habilitarScrollVistas();
-        
         gestionarMapa();
         detectarCliente();
     }
 
+    // --- UTILIDADES ---
     function gestionarMapa() {
         const visor = document.getElementById('visor-mapa-myl');
-        if (!visor) return;
-        const esMapa = window.location.hash.includes('map') || window.location.href.includes('/map');
-        visor.style.display = esMapa ? 'block' : 'none';
+        if (visor) {
+            const esMapa = window.location.href.includes('/map');
+            visor.style.display = esMapa ? 'block' : 'none';
+        }
     }
 
     function detectarCliente() {
-        const btn = document.getElementById('btn-editar-flotante');
+        const btn = document.getElementById('btn-edit-float');
         if (!btn) return;
-        const titulos = document.querySelectorAll('h1, h2, h3');
-        const clientes = JSON.parse(localStorage.getItem('clients') || '[]');
-        let encontrado = null;
 
-        for (let el of titulos) {
-            const txt = el.textContent.trim().toUpperCase();
-            if (txt.length > 3) {
-                const match = clientes.find(c => (c.name || "").toUpperCase() === txt);
-                if (match) { encontrado = match; break; }
-            }
+        // Lógica simple: si hay un H1/H2 con nombre de cliente conocido, mostramos botón
+        const titulos = Array.from(document.querySelectorAll('h1, h2, h3'));
+        const clientes = JSON.parse(localStorage.getItem('clients') || '[]');
+        const posibleNombre = titulos.find(t => {
+            const txt = t.textContent.trim();
+            return txt.length > 4 && clientes.some(c => c.name === txt);
+        });
+
+        if (posibleNombre && !document.querySelector('.modal-open')) {
+            const cliente = clientes.find(c => c.name === posibleNombre.textContent.trim());
+            btn.style.display = 'flex';
+            btn.onclick = () => window.abrirEditor && window.abrirEditor(cliente);
+        } else {
+            btn.style.display = 'none';
         }
-        btn.style.display = encontrado ? 'flex' : 'none';
-        if (encontrado) window.clienteEnEdicionGlobal = encontrado;
     }
 
-    // 4. Observer con throttling para no saturar
-    let timeout;
+    // 3. OBSERVER: Ejecutar constantemente pero eficiente
+    let tick;
     const observer = new MutationObserver(() => {
-        clearTimeout(timeout);
-        timeout = setTimeout(corregirUI, 100);
+        if (tick) return;
+        tick = requestAnimationFrame(() => {
+            forzarScrollModal();
+            tick = null;
+        });
     });
 
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
 
-    // Botón flotante inicial
-    if (!document.getElementById('btn-editar-flotante')) {
+    // Botón flotante
+    if (!document.getElementById('btn-edit-float')) {
         const b = document.createElement('div');
-        b.id = 'btn-editar-flotante';
+        b.id = 'btn-edit-float';
         b.innerHTML = '✏️';
-        b.onclick = () => window.abrirEditor ? window.abrirEditor() : null;
         document.body.appendChild(b);
     }
 
     // Ejecución inicial
-    corregirUI();
+    forzarScrollModal();
 
 })(window);
