@@ -22,8 +22,14 @@
     window.cerrarEditor = cerrarEditor;
 
     // Asegurar que 'clients' y 'orders' estén disponibles globalmente para el Dash
-    window.clients = JSON.parse(localStorage.getItem('clients') || '[]');
-    window.orders = JSON.parse(localStorage.getItem('orders') || '[]');
+    const rawClients = localStorage.getItem('clients') || '[]';
+    const rawOrders = localStorage.getItem('orders') || '[]';
+    window.clients = JSON.parse(rawClients);
+    window.orders = JSON.parse(rawOrders);
+
+    // Duplicar para compatibilidad absoluta
+    localStorage.setItem('clientes', rawClients);
+    localStorage.setItem('data_clientes', rawClients);
 
     let clienteEnEdicion = null;
 
@@ -134,29 +140,25 @@
 
                 if (faltaCampo || !c.name || !c.id) {
                     huboCambios = true;
-                    const idSeguro = c.id || String(Math.floor(Math.random() * 1000000));
+                    // Forzar ID numérico si es posible para compatibilidad con Dash
+                    const idNum = parseInt(c.id || c.cod_cliente || (1000 + idx));
                     const n = nombreReal || "Cliente sin nombre";
 
                     return {
-                        ...c,
-                        id: idSeguro,
+                        id: isNaN(idNum) ? (1000 + idx) : idNum,
+                        code: safe(c.code || c.cod_cliente || c.codigo || idNum),
                         name: n,
                         nombre: n,
-                        tienda: n,
-                        cliente: n,
-                        city: safe(c.city || c.poblacion || c.localidad),
-                        poblacion: safe(c.city || c.poblacion || c.localidad),
-                        province: safe(c.province || c.provincia),
-                        provincia: safe(c.province || c.provincia),
-                        address: safe(c.address || c.direccion),
-                        direccion: safe(c.address || c.direccion),
-                        phone: safe(c.phone || c.telefono || c.movil),
-                        telefono: safe(c.phone || c.telefono || c.movil),
-                        movil: safe(c.phone || c.telefono || c.movil),
-                        contact: safe(c.contact || c.contacto),
-                        contacto: safe(c.contact || c.contacto),
-                        email: safe(c.email || c.correo || c.mail),
-                        correo: safe(c.email || c.correo || c.mail),
+                        cif: safe(c.cif || c.nif || c.documento || ""),
+                        email: safe(c.email || c.correo || c.mail || ""),
+                        address: safe(c.address || c.direccion || ""),
+                        contact: safe(c.contact || c.contacto || ""),
+                        city: safe(c.city || c.poblacion || c.localidad || ""),
+                        province: safe(c.province || c.provincia || ""),
+                        phone: safe(c.phone || c.telefono || c.movil || ""),
+                        // Preservar lat/lng
+                        lat: c.lat || null,
+                        lng: c.lng || null
                     };
                 }
                 return c;
@@ -165,14 +167,17 @@
             if (huboCambios || clients.length > 0) {
                 const json = JSON.stringify(clients);
                 localStorage.setItem('clients', json);
-                localStorage.setItem('clientes', json); // Multi-idioma
-                localStorage.setItem('data_clientes', json); // Posible clave de la app
+                localStorage.setItem('clientes', json);
+                localStorage.setItem('data_clientes', json);
 
-                // Sincronizar con la variable global que la app busca para renderizar
                 window.clients = clients;
+                console.log(`✅ Base de Datos Sincronizada: ${clients.length} clientes.`);
 
-                console.log(`✅ Datos normalizados en múltiples llaves: ${clients.length} clientes.`);
-                if (huboCambios && !silencioso) location.reload();
+                // Si hubo cambios reales, recargamos para que React/Dash los vea
+                if (huboCambios) {
+                    console.log('🔄 Reiniciando para aplicar normalización de datos...');
+                    location.reload();
+                }
             }
         } catch (e) {
             console.error('❌ Error crítico en auto-reparación:', e);

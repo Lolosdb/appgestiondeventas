@@ -1,119 +1,116 @@
 /**
- * UI FIXES - v6 LIMPIEZA FINAL
- * Mantiene scroll inteligente, bloqueo de fondo y limpia botones obsoletos.
+ * UI FIXES - v7 ESTABILIDAD TOTAL
+ * Soluciona el scroll del modal y asegura la visibilidad de la app.
  */
 
 (function (window) {
     'use strict';
 
-    console.log('⚡ UI Fixes cargado - v6 (Limpieza Final)');
+    console.log('⚡ UI Fixes v7 - Estabilizando App...');
 
+    // 1. Inyectamos estilos ULTRA-AGRESIVOS para el scroll
     const style = document.createElement('style');
     style.innerHTML = `
-        body.modal-open { overflow: hidden !important; position: fixed !important; width: 100% !important; height: 100% !important; top: 0 !important; left: 0 !important; }
-        .modal-card-fixed-scroll { overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; max-height: 85vh !important; display: block !important; padding-bottom: 120px !important; box-sizing: border-box !important; }
+        /* Bloqueo selectivo del fondo */
+        body.modal-open { 
+            overflow: hidden !important; 
+            touch-action: none !important;
+        }
+
+        /* Forzar scroll en cualquier tarjeta blanca dentro de un contenedor fijo (modal) */
+        div[style*="fixed"] div.bg-white, 
+        div.fixed div.bg-white,
+        .modal-card,
+        [class*="modal"] [class*="card"] {
+            max-height: 80vh !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            padding-bottom: 60px !important;
+            display: block !important;
+        }
+
+        /* Asegurar que el botón flotante no moleste */
+        #btn-editar-flotante {
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            background: #2563eb;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            z-index: 9999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+        }
     `;
     document.head.appendChild(style);
 
-    const observer = new MutationObserver(() => {
-        requestAnimationFrame(() => {
-            aplicarCorreccionesUI();
-            gestionarVisibilidadMapa();
-            gestionarTextosAyuda();
-            detectarClienteEnPantalla();
-        });
-    });
+    // 2. Detección simplificada de modales
+    function corregirUI() {
+        const titulos = ['editar pedido', 'editar cliente', 'nuevo pedido', 'nuevo cliente', 'detalle pedido'];
+        let hayModal = false;
 
-    function aplicarCorreccionesUI() {
-        const titulosModales = ['editar pedido', 'editar cliente', 'nuevo pedido', 'nuevo cliente', 'detalle pedido'];
-        let modalRealmenteAbierto = false;
-
-        // PROTECCIÓN: Si vemos el texto de "importar Excel", NO estamos en un modal
-        const textoImportar = document.body.innerText.includes('Selecciona un archivo Excel');
-        if (textoImportar && !document.querySelector('.modal-card-fixed-scroll')) {
-            if (document.body.classList.contains('modal-open')) document.body.classList.remove('modal-open');
-            return;
-        }
-
-        document.querySelectorAll('h1, h2, h3, div, span').forEach(el => {
-            if (!el.textContent || el.offsetParent === null) return;
-
-            const txt = el.textContent.trim().toLowerCase();
-            if (titulosModales.includes(txt)) {
-                let p = el.parentElement;
-                while (p && p.tagName !== 'BODY') {
-                    const s = window.getComputedStyle(p);
-                    const zIndex = parseInt(s.zIndex) || 0;
-                    const esCapaSuperior = s.position === 'fixed' || s.position === 'absolute';
-
-                    // CRITERIO ESTRICTO: Un modal debe estar arriba de todo (z > 200) y tener sombra
-                    if (esCapaSuperior && zIndex > 100 && (s.boxShadow !== 'none' || s.backgroundColor !== 'transparent')) {
-                        modalRealmenteAbierto = true;
-                        if (!p.classList.contains('modal-card-fixed-scroll')) {
-                            p.classList.add('modal-card-fixed-scroll');
-                        }
-                        break;
-                    }
-                    p = p.parentElement;
+        // Buscamos textos de títulos de modal
+        document.querySelectorAll('h1, h2, h3, span, strong, div').forEach(el => {
+            const txt = (el.innerText || el.textContent || "").trim().toLowerCase();
+            if (titulos.includes(txt)) {
+                // Si el elemento es visible, marcamos que hay modal
+                if (el.offsetParent !== null || window.getComputedStyle(el).display !== 'none') {
+                    hayModal = true;
                 }
             }
         });
 
-        if (modalRealmenteAbierto) {
-            if (!document.body.classList.contains('modal-open')) document.body.classList.add('modal-open');
+        if (hayModal) {
+            document.body.classList.add('modal-open');
         } else {
-            if (document.body.classList.contains('modal-open')) document.body.classList.remove('modal-open');
+            document.body.classList.remove('modal-open');
         }
+
+        gestionarMapa();
+        detectarCliente();
     }
 
-    function gestionarTextosAyuda() {
-        document.querySelectorAll('div, p, span').forEach(el => {
-            if (el.textContent && el.textContent.includes('Selecciona el archivo "Clientes.xls"')) {
-                el.innerHTML = 'Selecciona un archivo Excel (<b>Clientes</b> o <b>Clientes_CON_COORDENADAS</b>) para actualizar la lista.';
-            }
-        });
-
-        // Auto-conectar el input file si existe
-        const inputExcel = document.getElementById('input-excel') || document.querySelector('input[type="file"]');
-        if (inputExcel && !inputExcel.dataset.hooked) {
-            inputExcel.onchange = (e) => { if (window.cargarExcel) window.cargarExcel(e.target); };
-            inputExcel.dataset.hooked = "true";
-        }
+    function gestionarMapa() {
+        const visor = document.getElementById('visor-mapa-myl');
+        if (!visor) return;
+        const esMapa = window.location.hash.includes('map') || window.location.href.includes('/map');
+        visor.style.display = esMapa ? 'block' : 'none';
     }
 
-    function gestionarVisibilidadMapa() {
-        const visorMyl = document.getElementById('visor-mapa-myl');
-        if (!visorMyl) return;
-        let mapaActivo = window.location.href.includes('/map');
-        document.querySelectorAll('a, div, span').forEach(el => {
-            const txt = el.textContent ? el.textContent.trim().toLowerCase() : '';
-            if (txt === 'mapa') {
-                const s = window.getComputedStyle(el);
-                if (el.className.includes('active') || s.color === 'rgb(255, 255, 255)') mapaActivo = true;
-            }
-        });
-        visorMyl.style.display = mapaActivo ? 'block' : 'none';
-    }
-
-    function detectarClienteEnPantalla() {
+    function detectarCliente() {
         const btn = document.getElementById('btn-editar-flotante');
         if (!btn) return;
-        const titulos = document.querySelectorAll('h1, h2, h3, div[class*="title"], span[class*="title"]');
+        const titulos = document.querySelectorAll('h1, h2, h3');
         const clientes = JSON.parse(localStorage.getItem('clients') || '[]');
         let encontrado = null;
+
         for (let el of titulos) {
-            const texto = el.textContent ? el.textContent.trim().toUpperCase() : "";
-            if (texto.length > 3) {
-                const match = clientes.find(c => (c.name || "").toUpperCase() === texto);
+            const txt = el.textContent.trim().toUpperCase();
+            if (txt.length > 3) {
+                const match = clientes.find(c => (c.name || "").toUpperCase() === txt);
                 if (match) { encontrado = match; break; }
             }
         }
-        if (encontrado) { btn.style.display = 'flex'; window.clienteEnEdicionGlobal = encontrado; }
-        else { btn.style.display = 'none'; }
+        btn.style.display = encontrado ? 'flex' : 'none';
+        if (encontrado) window.clienteEnEdicionGlobal = encontrado;
     }
+
+    // 3. Observer con throttling para no saturar
+    let timeout;
+    const observer = new MutationObserver(() => {
+        clearTimeout(timeout);
+        timeout = setTimeout(corregirUI, 100);
+    });
 
     observer.observe(document.body, { childList: true, subtree: true });
 
+    // Botón flotante inicial
     if (!document.getElementById('btn-editar-flotante')) {
         const b = document.createElement('div');
         b.id = 'btn-editar-flotante';
@@ -121,4 +118,8 @@
         b.onclick = () => window.abrirEditor ? window.abrirEditor() : null;
         document.body.appendChild(b);
     }
+
+    // Ejecución inicial
+    corregirUI();
+
 })(window);
