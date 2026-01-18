@@ -6,7 +6,7 @@
 (function (window) {
     'use strict';
 
-    console.log('⚡ UI Fixes cargado (MutationObserver) - v2 AGRESIVA');
+    console.log('⚡ UI Fixes cargado (MutationObserver) - v3 AJUSTE VISUAL');
 
     // Estado global de detección
     window.clienteEnEdicionGlobal = null;
@@ -18,19 +18,22 @@
         body.modal-open {
             overflow: hidden !important;
             overscroll-behavior: none !important;
-            position: fixed !important; /* Fix supremo para iOS */
+            position: fixed !important; 
             width: 100% !important;
             height: 100% !important;
+            top: 0 !important;
+            left: 0 !important;
         }
 
-        /* Forzar scroll suave en contenedores */
-        .modal-scroll-force {
+        /* Estilo para la tarjeta del modal */
+        .modal-card-scroll {
             overflow-y: auto !important;
-            -webkit-overflow-scrolling: touch !important; /* Importante para iOS */
+            -webkit-overflow-scrolling: touch !important; 
             overscroll-behavior: contain !important;
-            max-height: 85vh !important;
+            max-height: 70vh !important; /* Reducido para evitar solapamiento con navbar */
             display: block !important;
             pointer-events: auto !important;
+            padding-bottom: 80px !important; /* Espacio extra para llegar al final */
         }
     `;
     document.head.appendChild(style);
@@ -60,22 +63,20 @@
     // --- 2. FUNCIONES DE CORRECCIÓN ---
 
     function aplicarCorreccionesUI() {
-        // A. SCROLL MODAL EDITAR PEDIDO (DETECCIÓN FLEXIBLE)
-        // Buscamos contenedores que parezcan el modal
+        // A. SCROLL MODAL EDITAR PEDIDO
         const posiblesTitulos = Array.from(document.querySelectorAll('h1, h2, h3, div, span')).filter(el => {
             if (!el.textContent) return false;
             const txt = el.textContent.trim().toLowerCase();
-            return txt.includes('editar pedido') || txt.includes('editar cliente');
+            return txt.includes('editar pedido') || txt.includes('editar cliente') || txt.includes('nuevo pedido');
         });
 
-        // Filtrar solo los que son visibles
+        // Filtrar visibles para evitar falsos positivos
         const titulosVisibles = posiblesTitulos.filter(el => el.offsetParent !== null);
 
         if (titulosVisibles.length > 0) {
             // ACTIVAR BLOQUEO DE FONDO
             if (!document.body.classList.contains('modal-open')) {
                 document.body.classList.add('modal-open');
-                console.log('🔒 Modal detectado: Scroll de fondo BLOQUEADO');
             }
         } else {
             // DESACTIVAR BLOQUEO si no hay modal (y no está el mapa)
@@ -84,41 +85,30 @@
 
             if (!mapaVisible && document.body.classList.contains('modal-open')) {
                 document.body.classList.remove('modal-open');
-                // Limpiar styles inline por si acaso quedaron
                 document.body.style.removeProperty('overflow');
                 document.body.style.removeProperty('position');
-                console.log('🔓 Modal cerrado: Scroll restaurado');
             }
         }
 
         titulosVisibles.forEach(el => {
-            // 1. BUSCAR EL WRAPPER (EL CONTENEDOR OSCURO/FIXED)
-            // Buscamos hacia arriba un padre que tenga position fixed o absolute y cubra la pantalla
-            let wrapper = el.parentElement;
-            let foundWrapper = null;
+            // Buscar la TARJETA BLANCA (Contenido real)
+            let p = el.parentElement;
+            let tarjetaEncontrada = false;
 
-            while (wrapper && wrapper.tagName !== 'BODY') {
-                const s = window.getComputedStyle(wrapper);
-                if (s.position === 'fixed' || s.position === 'absolute' || parseInt(s.zIndex) > 100) {
-                    // Candidato a wrapper
-                    foundWrapper = wrapper;
-                }
-                // Si encontramos la tarjeta blanca en el camino, la marcamos
-                if (s.backgroundColor === 'rgb(255, 255, 255)' || s.backgroundColor === '#ffffff' || s.backgroundColor === 'white') {
-                    if (!wrapper.classList.contains('modal-scroll-force')) {
-                        wrapper.classList.add('modal-scroll-force'); // Aplicar clase CSS fuerza bruta
-                        // Asegurar padding para que el botón de guardar se vea
-                        wrapper.style.setProperty('padding-bottom', '100px', 'important');
+            while (p && p.tagName !== 'BODY') {
+                try {
+                    const s = window.getComputedStyle(p);
+                    // Detectamos la tarjeta blanca y le aplicamos nuestra clase
+                    if (s.backgroundColor === 'rgb(255, 255, 255)' || s.backgroundColor === '#ffffff' || s.backgroundColor === 'white') {
+                        if (!p.classList.contains('modal-card-scroll')) {
+                            p.classList.add('modal-card-scroll');
+                        }
+                        tarjetaEncontrada = true;
+                        // Ya encontramos la tarjeta, no necesitamos seguir subiendo más para esto
+                        break;
                     }
-                }
-                wrapper = wrapper.parentElement;
-            }
-
-            // Si encontramos un wrapper padre (el overlay oscuro), aseguramos que ocupe todo
-            if (foundWrapper) {
-                foundWrapper.style.setProperty('height', '100%', 'important');
-                foundWrapper.style.setProperty('overflow-y', 'auto', 'important'); // El overlay debe scrollear
-                foundWrapper.style.setProperty('-webkit-overflow-scrolling', 'touch', 'important');
+                } catch (e) { }
+                p = p.parentElement;
             }
         });
 
@@ -159,8 +149,7 @@
         const visorOld = document.getElementById('visor-mapa');
 
         if (mapaActivo) {
-            if (!document.body.classList.contains('modal-open')) document.body.classList.add('modal-open'); // Bloquear scroll body tb
-
+            if (!document.body.classList.contains('modal-open')) document.body.classList.add('modal-open');
             if (visorMyl && visorMyl.style.display !== 'block') {
                 visorMyl.style.display = 'block';
                 if (window.initMap) window.initMap();
@@ -168,9 +157,8 @@
                 visorOld.style.display = 'block';
             }
         } else {
-            // Solo desbloquear si no hay modal de edición abierto
             const titulos = Array.from(document.querySelectorAll('h1, h2, h3')).filter(el =>
-                el.textContent && (el.textContent.includes('Editar Pedido') || el.textContent.includes('Editar Cliente'))
+                el.textContent && (el.textContent.includes('Editar Pedido') || el.textContent.includes('Editar Cliente') || el.textContent.includes('Nuevo Pedido'))
             );
             if (titulos.length === 0 && document.body.classList.contains('modal-open')) {
                 document.body.classList.remove('modal-open');
