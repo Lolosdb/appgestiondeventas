@@ -2660,6 +2660,17 @@ async function renderAjustes() {
                         Ver Copias
                     </button>
                 </div>
+                
+                <div style="margin-top: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 12px; border: 1px dashed #e2e8f0;">
+                    <div style="display: flex; align-items: center; gap: 8px; color: #64748b; font-size: 0.75rem;">
+                        <span class="material-icons-round" style="font-size: 16px; color: #10b981;">schedule</span>
+                        <span style="font-weight: 700;">Backup Automático:</span>
+                        <span>L-V a las 20:30h</span>
+                    </div>
+                    <div style="margin-top: 4px; color: #94a3b8; font-size: 0.7rem; padding-left: 24px;">
+                        Última: ${localStorage.getItem('lastAutoBackupTime') || 'Ninguna todavía'}
+                    </div>
+                </div>
             </div>
 
             <!-- Card 2: Local Backups -->
@@ -3229,33 +3240,33 @@ window.checkAutoBackup = async function () {
     const now = new Date();
     const day = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
 
-    // Config: Monday (1) to Friday (5)
+    // Config: Lunes (1) a Viernes (5)
     if (day < 1 || day > 5) return;
 
     const hour = now.getHours();
     const minutes = now.getMinutes();
     const timeValue = hour * 60 + minutes;
 
-    // Target: 20:30 (1230) to 23:59 (1439)
-    // 20 * 60 + 30 = 1200 + 30 = 1230
-    // 23 * 60 + 59 = 1380 + 59 = 1439
-
-    if (timeValue >= 1230 && timeValue <= 1439) {
+    // Objetivo: 20:30 (1230 minutos) en adelante
+    if (timeValue >= 1230) {
         const todayStr = now.toISOString().split('T')[0];
         const lastBackup = localStorage.getItem('lastAutoBackupDate');
 
-        // If we haven't backed up today, do it
+        // Si no hemos hecho la copia de hoy, la ejecutamos
         if (lastBackup !== todayStr) {
-            console.log(`[AutoBackup] Hora: ${hour}:${minutes}. Ejecutando copia automática...`);
+            console.log(`[AutoBackup] ${now.toLocaleTimeString()}. Ejecutando copia programada diaria...`);
 
-            // Call backup in silent mode
             const success = await initiateDriveBackup(true);
 
             if (success) {
                 localStorage.setItem('lastAutoBackupDate', todayStr);
-                console.log("[AutoBackup] Copia completada y registrada.");
-            } else {
-                console.error("[AutoBackup] Falló la copia automática.");
+                localStorage.setItem('lastAutoBackupTime', now.toLocaleString());
+                console.log("[AutoBackup] Copia automática de hoy completada.");
+
+                // Si estamos en Ajustes, refrescar para mostrar la fecha
+                if (document.querySelector('.ajustes-container')) {
+                    renderAjustes();
+                }
             }
         }
     }
@@ -3487,7 +3498,7 @@ function openInfoModal() {
                 <button class="icon-btn" onclick="closeInfoModal()"><span class="material-icons-round">close</span></button>
             </div>
             <div class="modal-body text-gray-800" style="padding: 1.5rem; line-height: 1.6;">
-                <p class="text-center font-bold text-blue-primary mb-4" style="font-size: 0.95rem; opacity: 0.9;">
+                <p class="text-center font-bold text-blue-primary mb-4" style="font-size: 1.1rem; opacity: 1;">
                     App creada por Manuel Fco. Serantes Pérez
                 </p>
 
@@ -3497,25 +3508,31 @@ function openInfoModal() {
                     </h3>
                     <ul class="flex flex-col gap-4">
                         <li>
-                            <strong>📊 Dashboard (Inicio):</strong> Tu panel de control. Gráfico circular de progreso (expandido para mejor lectura) y comparativa de objetivos anuales con nuevo diseño premium.
+                            <strong>📊 Dashboard (Inicio):</strong> Tu panel de control. Gráfico circular de progreso y comparativa de objetivos anuales con diseño premium optimizado.
                         </li>
                         <li>
-                            <strong>🛍️ Pedidos:</strong> Registro de actividad comercial con filtros avanzados y creación rápida de ventas.
+                            <strong>📈 Ventas e Histórico:</strong> Análisis detallado de facturación. Ahora optimizado para ver el año actual al instante, con <strong>scroll horizontal suave</strong> y sin scroll vertical.
                         </li>
                         <li>
-                            <strong>🏆 Ranking de Ventas:</strong> Analiza tu rendimiento y descubre tus mejores momentos del año con el nuevo sistema de clasificación por facturación.
+                            <strong>🧾 Facturación Real:</strong> Introduce tus datos de factura directamente. Rediseñada para mostrar 3 años simultáneos y ajustarse perfectamente a tu pantalla.
                         </li>
                         <li>
-                            <strong>💶 Totales por Zona:</strong> Análisis preciso por provincias. Ahora incluye el <strong>Total de Pedidos</strong> y el <strong>Ticket Medio Real</strong> (excluyendo automáticamente las muestras de 0€).
+                            <strong>🏆 Ranking de Ventas:</strong> Analiza tu rendimiento anual y descubre tus mejores clientes con el sistema de clasificación por volumen de ventas.
+                        </li>
+                        <li>
+                            <strong>💶 Totales por Zona:</strong> Análisis preciso por provincias. Incluye <strong>Total de Pedidos</strong> y el <strong>Ticket Medio Real</strong> (excluyendo automáticamente las muestras de 0€).
+                        </li>
+                        <li>
+                            <strong>🕒 Medias Mensuales:</strong> Consulta tus promedios históricos con el nuevo diseño de tarjetas premium y análisis de tendencia anual rápida.
                         </li>
                         <li>
                             <strong>👥 Agenda de Clientes:</strong> Base de datos completa con **Búsqueda Inteligente** y botón de limpieza rápida para agilizar tus consultas.
                         </li>
                         <li>
-                            <strong>🔔 Panel de Alertas:</strong> Localiza clientes inactivos al instante mediante el nuevo sistema de <strong>tarjetas tintadas</strong> (Verde: Activo | Rojo: +35 días sin compra).
+                            <strong>🔔 Panel de Alertas:</strong> Localiza clientes inactivos mediante el nuevo sistema de <strong>tarjetas tintadas</strong> (Verde: Activo | Rojo: +35 días sin compra).
                         </li>
                         <li>
-                            <strong>📍 Mapa Interactivo:</strong> Visualización geográfica de tu red de clientes con código de colores según su actividad reciente.
+                            <strong>🎯 Objetivos de Venta:</strong> Gestiona tus metas mensuales de forma visual en una vista de pantalla única sin necesidad de desplazamientos.
                         </li>
                     </ul>
                 </section>
@@ -3572,12 +3589,12 @@ function openInfoModal() {
                     <div>
                         <p class="text-xs text-blue-900 font-bold mb-1 italic">Seguridad y Backups</p>
                         <p class="text-xs text-blue-800">
-                            Recuerda sincronizar tus pedidos con <strong>Google Drive</strong> desde los Ajustes periódicamente. Esto asegura que tus datos estén a salvo ante cualquier problema con tu dispositivo.
+                            Tus datos están protegidos. La app realiza una <strong>copia automática de lunes a viernes a las 20:30h</strong>. También puedes hacer copias manuales desde Ajustes en cualquier momento.
                         </p>
                     </div>
                 </div>
 
-                <p class="text-center text-xs font-bold text-blue-primary mt-8 mb-4" style="opacity: 0.8;">
+                <p class="text-center font-bold text-blue-primary mt-8 mb-4" style="font-size: 1.1rem; opacity: 1;">
                     App creada por Manuel Fco. Serantes Pérez
                 </p>
             </div>
