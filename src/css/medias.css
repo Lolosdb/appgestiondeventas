@@ -1,13 +1,14 @@
 /* Medias Mensuales Styles */
 
 .medias-container {
-    height: calc(100vh - 140px);
+    flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 0.5rem;
-    gap: 0.5rem;
+    padding: 1rem;
+    gap: 1rem;
     overflow: hidden;
-    /* No scroll */
+    background-color: #f8fafc;
+    /* Soft background to make cards pop */
 }
 
 /* Grid for 12 months */
@@ -15,12 +16,9 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(4, 1fr);
-    gap: 0.5rem;
-    /* Remove flex: 1 to stop it from forcing full height usage, 
-       allow card to take space or be centered */
-    flex: 0 1 auto;
-    height: 70%;
-    /* Occupy reasonable portion */
+    gap: 0.75rem;
+    flex: 1;
+    /* Take all available space equitably */
 }
 
 .month-card {
@@ -30,59 +28,82 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    border: 1px solid #f1f5f9;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    border: 1px solid #edf2f7;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease;
+}
+
+/* Subtle side indicator */
+.month-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background-color: #009ee3;
+    opacity: 0.7;
 }
 
 .month-card-title {
-    font-size: 0.85rem;
-    /* Increased from 0.65rem */
+    font-size: 0.75rem;
     font-weight: 800;
-    color: #3b82f6;
+    color: #64748b;
     text-transform: uppercase;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.15rem;
+    letter-spacing: 0.5px;
 }
 
 .month-card-value {
-    font-size: 0.9rem;
-    font-weight: 800;
+    font-size: 1.1rem;
+    font-weight: 900;
     color: #1e293b;
 }
 
 /* Bottom Annual Average Card */
 .annual-media-card {
-    background: linear-gradient(135deg, #1e293b 0%, #312e81 100%);
-    border-radius: 16px;
-    padding: 1rem;
+    background: linear-gradient(135deg, #0f172a 0%, #312e81 100%);
+    border-radius: 20px;
+    padding: 1rem 1.5rem;
     position: relative;
     color: white;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    height: 100px;
-    /* Center in remaining space */
-    margin-top: auto;
-    margin-bottom: auto;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+    height: 90px;
+    /* Reduced from 120px */
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 0.5rem;
+    /* Additional breathing room at bottom */
 }
 
 .annual-title {
     font-size: 0.7rem;
+    /* Slightly smaller */
     font-weight: 700;
     text-transform: uppercase;
-    opacity: 0.9;
+    color: #94a3b8;
     margin-bottom: 0.25rem;
+    letter-spacing: 1px;
 }
 
 .annual-value {
-    font-size: 2rem;
+    font-size: 2.2rem;
+    /* Reduced from 2.75rem to fit smaller height */
     font-weight: 900;
     line-height: 1;
+    color: white;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
 .annual-chart-deco {
     position: absolute;
-    right: 1rem;
-    bottom: 0.5rem;
-    opacity: 0.2;
+    right: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.15;
 }

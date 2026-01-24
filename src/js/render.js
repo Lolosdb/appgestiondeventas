@@ -2558,7 +2558,7 @@ async function renderMedias() {
     // Header logic: 'history' (clock) is active
     const headerHtml = getCommonHeaderHtml('Medias Mensuales');
 
-    let contentHtml = `<main style="padding: 0; display: flex; flex-direction: column; height: 100vh;">`; // full height management manually
+    let contentHtml = `<main style="padding: 0; display: flex; flex-direction: column; height: calc(100vh - 110px); overflow: hidden;">`;
 
     const months = [
         'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -2584,7 +2584,6 @@ async function renderMedias() {
     });
 
     // Calculate Total Annual Average
-    // Sum of all month averages gives the average annual total
     const annualAverage = Math.floor(monthAverages.reduce((a, b) => a + b, 0));
 
 
@@ -2603,7 +2602,7 @@ async function renderMedias() {
                 <span class="annual-title">MEDIA VENTAS</span>
                 <span class="annual-value">${annualAverage.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}</span>
                 <div class="annual-chart-deco">
-                    <span class="material-icons-round" style="font-size: 64px;">show_chart</span>
+                    <span class="material-icons-round" style="font-size: 80px; color: white;">show_chart</span>
                 </div>
             </div>
         </div>
