@@ -821,8 +821,12 @@ async function renderTotales() {
     const ordersThisYearValued = ordersThisYear.filter(o => (parseFloat(o.amount) || 0) > 0);
     const totalOrdersThisYearValued = ordersThisYearValued.length;
 
-    // Importe medio por pedido (Facturación Real de la vista Ventas / Total Pedidos con valor > 0)
-    const averageOrderAmount = totalOrdersThisYearValued > 0 ? (facturacionReal / totalOrdersThisYearValued) : 0;
+    // Nuevo cálculo: Pedidos con "Facturado todo" para el denominador del Importe Medio
+    const ordersWithFacturadoTodo = ordersThisYear.filter(o => o.facturadoTodo && o.facturadoTodo !== '' && o.facturadoTodo !== '-');
+    const countFacturadoTodo = ordersWithFacturadoTodo.length;
+
+    // Importe medio por pedido (Facturación Real / Total Pedidos con "Facturado todo")
+    const averageOrderAmount = countFacturadoTodo > 0 ? (facturacionReal / countFacturadoTodo) : 0;
 
     contentHtml += `
         <h3 class="text-lg font-bold mt-6 mb-3">Estadísticas Generales</h3>
@@ -840,7 +844,7 @@ async function renderTotales() {
                 <h3 class="client-stat-value" style="color: var(--primary-dark-blue);">${totalOrdersThisYearValued} pedidos</h3>
             </div>
             <div class="community-card">
-                <p class="community-name">Importe Medio Pedido</p>
+                <p class="community-name">Importe Medio Facturado</p>
                 <h3 class="client-stat-value" style="color: var(--accent-purple);">${Math.round(averageOrderAmount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")} €</h3>
             </div>
         </div>
