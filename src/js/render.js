@@ -3857,9 +3857,9 @@ async function openRankingModal() {
                     <div class="rank-badge ${rankClass}">
                         ${item.rank}
                     </div>
-                    <div class="flex flex-col" style="gap: 8px;">
-                        <span class="font-bold text-gray-800 text-sm" style="line-height: 1;">${item.name}</span>
-                        <span class="text-[10px] text-blue-400 font-bold uppercase" style="letter-spacing: 1px;">${item.orderCount} pedido${item.orderCount !== 1 ? 's' : ''}</span>
+                    <div class="flex flex-col" style="gap: 6px;">
+                        <span class="font-bold text-slate-900" style="font-size: 16px; line-height: 1.2;">${item.name}</span>
+                        <span class="text-[11px] text-slate-500 font-medium">${item.orderCount} pedido${item.orderCount !== 1 ? 's' : ''}</span>
                     </div>
                 </div>
                 <span class="font-bold text-blue-primary text-sm">${Math.round(item.amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")} €</span>
