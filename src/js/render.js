@@ -89,7 +89,7 @@ async function renderDash() {
 
     // 1. Ventas del Mes Card (Updated with 2 columns)
     contentHtml += `
-        <div class="card">
+        <div class="card" style="border-left: 5px solid #009ee3; background: linear-gradient(to right, #ffffff, #f0f9ff);">
             <div class="sales-card-grid">
                 <div>
                     <p class="card-title-sm">Ventas del Mes</p>
@@ -122,6 +122,29 @@ async function renderDash() {
                     <div class="progress-bar" style="width: ${progressPercent}%;"></div>
                 </div>
                 <span class="material-icons-round text-blue-primary" style="font-size: 20px; opacity: 0.5;">show_chart</span>
+            </div>
+        </div>
+    `;
+
+    // 1b. Ventas del Año Card
+    const annualSales = stats.ventasAnio.total;
+    const annualOrders = stats.stats.pedidosAnio;
+
+    contentHtml += `
+        <div class="card" style="margin-bottom: 1rem; border-left: 5px solid #009ee3; background: linear-gradient(to right, #ffffff, #f0f9ff);">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="card-title-sm">Ventas del Año</p>
+                    <h2 class="price-display-lg" style="font-size: 1.8rem;">${Math.round(annualSales).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")} €</h2>
+                    <div class="flex items-center gap-1 mt-2">
+                        <span class="material-icons-round" style="font-size: 14px; color: #64748b;">inventory_2</span>
+                        <span class="text-xs font-bold" style="color: #64748b;">${annualOrders} pedidos realizados</span>
+                    </div>
+                </div>
+                <div class="flex flex-col items-center justify-center bg-blue-50 rounded-2xl p-3" style="min-width: 60px;">
+                    <span class="material-icons-round" style="color: #009ee3; font-size: 32px;">event_note</span>
+                    <span class="text-[10px] font-bold text-blue-400 uppercase mt-1">${currentYear}</span>
+                </div>
             </div>
         </div>
     `;
@@ -203,7 +226,7 @@ async function renderDash() {
     contentHtml += `
         <div class="flex items-center gap-2 mb-4 mt-6">
              <span class="material-icons-round text-yellow-500" style="color: #eab308;">emoji_events</span>
-             <h3 class="font-bold">Top Clientes</h3>
+             <h3 class="font-bold">Top Clientes Mensual</h3>
         </div>
     `;
 
@@ -3834,7 +3857,10 @@ async function openRankingModal() {
                     <div class="rank-badge ${rankClass}">
                         ${item.rank}
                     </div>
-                    <span class="font-bold text-gray-800 text-sm">${item.name}</span>
+                    <div class="flex flex-col" style="gap: 8px;">
+                        <span class="font-bold text-gray-800 text-sm" style="line-height: 1;">${item.name}</span>
+                        <span class="text-[10px] text-blue-400 font-bold uppercase" style="letter-spacing: 1px;">${item.orderCount} pedido${item.orderCount !== 1 ? 's' : ''}</span>
+                    </div>
                 </div>
                 <span class="font-bold text-blue-primary text-sm">${Math.round(item.amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")} €</span>
             </div>

@@ -505,15 +505,20 @@ class DataManager {
 
         const totalVentasMes = ordersThisMonth.reduce((sum, o) => sum + (parseFloat(o.amount) || 0), 0);
 
-        // Clientes activos (AÑO en curso)
-        // Se cuentan los clientes únicos que han hecho al menos 1 pedido este AÑO.
-        const activeClientsSet = new Set();
-        orders.forEach(o => {
+        // Ventas del año
+        const ordersThisYear = orders.filter(o => {
             const d = new Date(o.dateISO || o.date);
-            if (d.getFullYear() === currentYear) {
-                // Prioritize code, fallback to shop name
-                activeClientsSet.add(o.clientCode || o.shop);
-            }
+            return d.getFullYear() === currentYear;
+        });
+        const totalVentasAnio = ordersThisYear.reduce((sum, o) => sum + (parseFloat(o.amount) || 0), 0);
+        const ordersThisYearValued = ordersThisYear.filter(o => (parseFloat(o.amount) || 0) > 0);
+
+        // Clientes activos (MES en curso)
+        // Se cuentan los clientes únicos que han hecho al menos 1 pedido este MES.
+        const activeClientsSet = new Set();
+        ordersThisMonth.forEach(o => {
+            // Prioritize code, fallback to shop name
+            activeClientsSet.add(o.clientCode || o.shop);
         });
 
         // Top Clientes (Global o Mes? Asumiremos Mes por ahora para el Dash)
@@ -566,7 +571,11 @@ class DataManager {
             },
             stats: {
                 clientesActivos: activeClientsSet.size,
-                pedidosMes: ordersThisMonthValued.length
+                pedidosMes: ordersThisMonthValued.length,
+                pedidosAnio: ordersThisYearValued.length
+            },
+            ventasAnio: {
+                total: totalVentasAnio
             },
             topClientes,
             tendencia
@@ -582,17 +591,19 @@ class DataManager {
             return d.getFullYear() === year;
         });
 
-        // 2. Aggregate sales by client
-        const clientSales = {};
+        // 2. Aggregate sales and order count by client
+        const clientStats = {};
         yearlyOrders.forEach(o => {
             const key = o.shop;
-            if (!clientSales[key]) clientSales[key] = 0;
-            clientSales[key] += parseFloat(o.amount) || 0;
+            if (!clientStats[key]) clientStats[key] = { amount: 0, orderCount: 0 };
+            const amt = parseFloat(o.amount) || 0;
+            clientStats[key].amount += amt;
+            if (amt > 0) clientStats[key].orderCount += 1;
         });
 
         // 3. Convert to array and sort
-        const ranking = Object.entries(clientSales)
-            .map(([name, amount]) => ({ name, amount }))
+        const ranking = Object.entries(clientStats)
+            .map(([name, stats]) => ({ name, ...stats }))
             .sort((a, b) => b.amount - a.amount)
             .map((item, index) => ({ ...item, rank: index + 1 }));
 
