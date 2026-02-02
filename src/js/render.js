@@ -3853,16 +3853,16 @@ async function openRankingModal() {
 
             rankingListHtml += `
             <div class="card p-3 flex items-center justify-between" style="margin-bottom: 0.5rem; border-radius: 12px; border: 1px solid #f3f4f6;">
-                <div class="flex items-center gap-3">
-                    <div class="rank-badge ${rankClass}">
+                <div class="flex items-center gap-3" style="flex: 1; min-width: 0;">
+                    <div class="rank-badge ${rankClass}" style="flex-shrink: 0;">
                         ${item.rank}
                     </div>
-                    <div class="flex flex-col" style="gap: 6px;">
-                        <span class="font-bold text-slate-900" style="font-size: 16px; line-height: 1.2;">${item.name}</span>
+                    <div class="flex flex-col" style="gap: 6px; min-width: 0;">
+                        <span class="font-bold text-slate-900" style="font-size: 16px; line-height: 1.2; word-break: break-word;">${item.name}</span>
                         <span class="text-[11px] text-slate-500 font-medium">${item.orderCount} pedido${item.orderCount !== 1 ? 's' : ''}</span>
                     </div>
                 </div>
-                <span class="font-bold text-blue-primary text-sm">${Math.round(item.amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")} €</span>
+                <span class="font-bold text-blue-primary text-sm" style="white-space: nowrap; flex-shrink: 0; margin-left: 12px;">${Math.round(item.amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")} €</span>
             </div>
             `;
         });
