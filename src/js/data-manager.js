@@ -124,6 +124,7 @@ class DataManager {
                         province: getValue(row, 'PROVINCIA'),
                         cp: getValue(row, 'CP', 'C.P.', 'CODIGO POSTAL', 'CÓDIGO POSTAL'),
                         phone: String(getValue(row, 'TELEFONO', 'TELÉFONO', 'MOVIL') || '').replace(/^['´]+/, '').trim(),
+                        schedule: getValue(row, 'HORARIO', 'HORARIOS', 'SCHEDULE'),
                         lat: getValue(row, 'LATITUD', 'LAT', 'LATITUDE'),
                         lng: getValue(row, 'LONGITUD', 'LNG', 'LONG', 'LON', 'LONGITUDE'),
                         createdAt: new Date().toISOString()
@@ -158,6 +159,103 @@ class DataManager {
         });
     }
 
+    _getColumnMap(headerRow) {
+        const map = {};
+        if (!headerRow) return map;
+
+        headerRow.forEach((val, idx) => {
+            const clean = String(val || '').trim().toUpperCase();
+            if (['CODIGO', 'CÓDIGO'].includes(clean)) map.code = idx;
+            else if (['TIENDA', 'NOMBRE', 'CLIENTE'].includes(clean)) map.name = idx;
+            else if (['NIF', 'DNI'].includes(clean)) map.nif = idx;
+            else if (['MAIL', 'EMAIL', 'CORREO'].includes(clean)) map.email = idx;
+            else if (['DIRECCION', 'DIRECCIÓN'].includes(clean)) map.address = idx;
+            else if (['CONTACTO'].includes(clean)) map.contact = idx;
+            else if (['POBLACION', 'POBLACIÓN', 'CIUDAD'].includes(clean)) map.location = idx;
+            else if (['PROVINCIA'].includes(clean)) map.province = idx;
+            else if (['CP', 'C.P.'].includes(clean)) map.cp = idx;
+            else if (['TELEFONO', 'TELÉFONO', 'MOVIL'].includes(clean)) map.phone = idx;
+            else if (['HORARIO', 'HORARIOS', 'SCHEDULE'].includes(clean)) map.schedule = idx;
+            else if (['LATITUD', 'LAT'].includes(clean)) map.lat = idx;
+            else if (['LONGITUD', 'LNG', 'LON'].includes(clean)) map.lng = idx;
+        });
+
+        const defaults = {
+            code: 0, name: 1, nif: 2, email: 3, address: 4, contact: 5,
+            location: 6, province: 7, cp: 8, phone: 9, schedule: 10,
+            lat: 21, lng: 22
+        };
+
+        Object.keys(defaults).forEach(key => {
+            if (map[key] === undefined) map[key] = defaults[key];
+        });
+
+        return map;
+    }
+
+    _cleanAndSortRows(rows) {
+        if (!rows || rows.length === 0) return [];
+
+        // 1. Encontrar la cabecera real (la primera fila que tiene "CODIGO" o "CÓDIGO")
+        // Habitualmente es la fila 0, pero buscamos por si acaso hay basura arriba
+        let headerIndex = -1;
+        for (let i = 0; i < Math.min(rows.length, 10); i++) {
+            const rowStr = JSON.stringify(rows[i]).toUpperCase();
+            if (rowStr.includes('"CODIGO"') || rowStr.includes('"CÓDIGO"')) {
+                headerIndex = i;
+                break;
+            }
+        }
+
+        // Si no se encuentra, asumimos la primera fila como cabecera por defecto
+        if (headerIndex === -1) headerIndex = 0;
+
+        const headerRow = rows[headerIndex];
+        const colMap = this._getColumnMap(headerRow);
+
+        // 2. Extraer datos (filas por debajo de la cabecera)
+        let dataRows = rows.slice(headerIndex + 1);
+
+        // 3. REGLA: Eliminar si A y B están vacíos. Guardar si alguno tiene carácter.
+        // Columna A = colMap.code, Columna B = colMap.name
+        dataRows = dataRows.filter(r => {
+            if (!Array.isArray(r)) return false;
+            const colA = String(r[colMap.code] || '').trim();
+            const colB = String(r[colMap.name] || '').trim();
+            return colA !== '' || colB !== ''; // Conservar si alguno tiene datos
+        });
+
+        // 4. Limpieza de trailing cells (evita ghost columns)
+        dataRows = dataRows.map(r => {
+            const cleaned = r.map(cell => typeof cell === 'string' ? cell.trim() : cell);
+            // Cortar el array al último elemento que tenga algo para no engordar el Excel
+            let lastIdx = -1;
+            for (let i = cleaned.length - 1; i >= 0; i--) {
+                if (cleaned[i] !== '' && cleaned[i] !== null && cleaned[i] !== undefined) {
+                    lastIdx = i;
+                    break;
+                }
+            }
+            return lastIdx === -1 ? [] : cleaned.slice(0, lastIdx + 1);
+        });
+
+        // 5. Ordenar alfabéticamente por Población (Columna G / colMap.location)
+        dataRows.sort((a, b) => {
+            const valA = (a[colMap.location] || "").toString().toLowerCase().trim();
+            const valB = (b[colMap.location] || "").toString().toLowerCase().trim();
+            if (valA === valB) {
+                // Si la población es igual, ordenar por Nombre
+                const nameA = (a[colMap.name] || "").toString().toLowerCase().trim();
+                const nameB = (b[colMap.name] || "").toString().toLowerCase().trim();
+                return nameA.localeCompare(nameB);
+            }
+            return valA.localeCompare(valB);
+        });
+
+        // 6. Devolver con la cabecera en el primer puesto (Fila 1 real)
+        return [headerRow, ...dataRows];
+    }
+
     async saveNewClientToDrive(url, filename, newClientData) {
         try {
             // 1. Download current file
@@ -178,42 +276,41 @@ class DataManager {
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
 
-            // 3. Convert to JSON with loose parsing to preserve all cols
+            // 3. Convert to JSON + Clean Structure
             let rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+            rows = this._cleanAndSortRows(rows);
 
-            // Prepare New Row using indexes A=0 to W=22
-            const newRow = [];
-            for (let i = 0; i <= 22; i++) newRow[i] = "";
+            const headerRow = rows[0] || [];
+            const colMap = this._getColumnMap(headerRow);
 
-            newRow[0] = newClientData.code;      // A - CODIGO
-            newRow[1] = newClientData.name;      // B - TIENDA
-            newRow[2] = newClientData.nif;       // C - NIF
-            newRow[3] = newClientData.email;     // D - MAIL
-            newRow[4] = newClientData.address;   // E - DIRECCION
-            newRow[5] = newClientData.contact;   // F - CONTACTO
-            newRow[6] = newClientData.location;  // G - POBLACION
-            newRow[7] = newClientData.province;  // H - PROVINCIA
-            newRow[8] = newClientData.cp;        // I - C.P.
+            // Prepare New Row
+            const maxIdx = Math.max(...Object.values(colMap), 22);
+            const newRow = new Array(maxIdx + 1).fill("");
 
-            // Assuming J is index 9 based on typical Excel A=0 logic?
-            // A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, I=8, J=9
-            newRow[9] = newClientData.phone;     // J - TELEFONO
-            newRow[10] = newClientData.schedule; // K - HORARIO
-
-            // V=21 (22nd letter), W=22 (23rd letter)
-            newRow[21] = newClientData.lat;      // V - LATITUD 
-            newRow[22] = newClientData.lng;      // W - LONGITUD
+            newRow[colMap.code] = newClientData.code;
+            newRow[colMap.name] = newClientData.name;
+            newRow[colMap.nif] = newClientData.nif;
+            newRow[colMap.email] = newClientData.email;
+            newRow[colMap.address] = newClientData.address;
+            newRow[colMap.contact] = newClientData.contact;
+            newRow[colMap.location] = newClientData.location;
+            newRow[colMap.province] = newClientData.province;
+            newRow[colMap.cp] = newClientData.cp;
+            newRow[colMap.phone] = newClientData.phone;
+            newRow[colMap.schedule] = newClientData.schedule;
+            newRow[colMap.lat] = newClientData.lat;
+            newRow[colMap.lng] = newClientData.lng;
 
             rows.push(newRow);
 
-            // 4. Sort by Population (Index 6)
-            const header = rows.shift(); // Remove header
+            // 4. Final Re-sort after push
+            const header = rows.shift();
             rows.sort((a, b) => {
-                const valA = (a[6] || "").toString().toLowerCase();
-                const valB = (b[6] || "").toString().toLowerCase();
+                const valA = (a[colMap.location] || "").toString().toLowerCase();
+                const valB = (b[colMap.location] || "").toString().toLowerCase();
                 return valA.localeCompare(valB);
             });
-            rows.unshift(header); // Put header back
+            rows.unshift(header);
 
             // 5. Write back to Sheet
             const newWorksheet = XLSX.utils.aoa_to_sheet(rows);
@@ -272,14 +369,17 @@ class DataManager {
             const workbook = XLSX.read(bytes, { type: 'array' });
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
+            // 3. Convert + Sanitize File
             let rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+            rows = this._cleanAndSortRows(rows);
 
-            // 3. Find and Update
-            // Row 0 is header
+            const headerRow = rows[0] || [];
+            const colMap = this._getColumnMap(headerRow);
+
+            // 3b. Find and Update
             let rowIndex = -1;
             for (let i = 1; i < rows.length; i++) {
-                // Loose check for ID (string vs num)
-                if (String(rows[i][0]) === String(originalCode)) {
+                if (String(rows[i][colMap.code]).trim() === String(originalCode).trim()) {
                     rowIndex = i;
                     break;
                 }
@@ -287,32 +387,28 @@ class DataManager {
 
             if (rowIndex === -1) throw new Error("Cliente no encontrado en el Excel.");
 
-            // Update row (index i)
-            const row = rows[rowIndex]; // Reference
-            // Ensure row is array
-            if (!Array.isArray(row)) rows[rowIndex] = [];
+            const maxIdx = Math.max(...Object.values(colMap), 22);
+            if (!Array.isArray(rows[rowIndex])) rows[rowIndex] = new Array(maxIdx + 1).fill("");
 
-            // Map fields same as saveNewClientToDrive
-            rows[rowIndex][0] = updatedData.code;      // A
-            rows[rowIndex][1] = updatedData.name;      // B
-            rows[rowIndex][2] = updatedData.nif;       // C
-            rows[rowIndex][3] = updatedData.email;     // D
-            rows[rowIndex][4] = updatedData.address;   // E
-            rows[rowIndex][5] = updatedData.contact;   // F
-            rows[rowIndex][6] = updatedData.location;  // G
-            rows[rowIndex][7] = updatedData.province;  // H
-            rows[rowIndex][8] = updatedData.cp;        // I
-            rows[rowIndex][9] = updatedData.phone;     // J
-            rows[rowIndex][10] = updatedData.schedule; // K
+            rows[rowIndex][colMap.code] = updatedData.code;
+            rows[rowIndex][colMap.name] = updatedData.name;
+            rows[rowIndex][colMap.nif] = updatedData.nif;
+            rows[rowIndex][colMap.email] = updatedData.email;
+            rows[rowIndex][colMap.address] = updatedData.address;
+            rows[rowIndex][colMap.contact] = updatedData.contact;
+            rows[rowIndex][colMap.location] = updatedData.location;
+            rows[rowIndex][colMap.province] = updatedData.province;
+            rows[rowIndex][colMap.cp] = updatedData.cp;
+            rows[rowIndex][colMap.phone] = updatedData.phone;
+            rows[rowIndex][colMap.schedule] = updatedData.schedule;
+            rows[rowIndex][colMap.lat] = updatedData.lat;
+            rows[rowIndex][colMap.lng] = updatedData.lng;
 
-            rows[rowIndex][21] = updatedData.lat;      // V
-            rows[rowIndex][22] = updatedData.lng;      // W
-
-            // 4. Sort
+            // 4. Final Re-sort (in case location changed)
             const header = rows.shift();
             rows.sort((a, b) => {
-                const valA = (a[6] || "").toString().toLowerCase();
-                const valB = (b[6] || "").toString().toLowerCase();
+                const valA = (a[colMap.location] || "").toString().toLowerCase();
+                const valB = (b[colMap.location] || "").toString().toLowerCase();
                 return valA.localeCompare(valB);
             });
             rows.unshift(header);
@@ -380,15 +476,22 @@ class DataManager {
             const worksheet = workbook.Sheets[firstSheetName];
             let rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
 
+            // compact & clean
+            rows = this._cleanAndSortRows(rows);
+            const headerRow = rows[0] || [];
+            const colMap = this._getColumnMap(headerRow);
+
             // 3. Filter
             const header = rows.shift();
             const initialLen = rows.length;
 
-            rows = rows.filter(r => String(r[0]) !== String(clientCode));
+            rows = rows.filter(r => String(r[colMap.code]).trim() !== String(clientCode).trim());
 
             if (rows.length === initialLen) throw new Error("Cliente no encontrado para eliminar.");
 
+            // Put header back and final clean/resort
             rows.unshift(header);
+            rows = this._cleanAndSortRows(rows);
 
             // 4. Upload
             const newWorksheet = XLSX.utils.aoa_to_sheet(rows);

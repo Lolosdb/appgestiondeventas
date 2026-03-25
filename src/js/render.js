@@ -43,7 +43,13 @@ async function renderDash() {
 
     // Header
     const currentYear = new Date().getFullYear();
-    const headerHtml = getCommonHeaderHtml('Dash');
+    const headerHtml = getCommonHeaderHtml('Dash', {
+        extraAction: `
+            <button class="icon-btn text-white" onclick="openReportModal()" title="Generar Informe Estratégico">
+                <span class="material-icons-round">analytics</span>
+            </button>
+        `
+    });
 
     // Main Content
     let contentHtml = `<main style="padding: 1rem;">`;
@@ -160,26 +166,46 @@ async function renderDash() {
             <!-- Simple Bar Chart Simulation -->
             <div class="trend-chart-container" style="height: 150px; display: flex; align-items: flex-end; justify-content: space-around; padding-top: 20px;">
                 ${(() => {
-            const maxVal = Math.max(...stats.tendencia.map(t => t.ventas), 1000);
+            const ventasValidos = stats.tendencia.filter(t => t.ventas > 0).map(t => t.ventas);
+            const maxVal = Math.max(...ventasValidos, 1000);
+
             return stats.tendencia.map((t, index) => {
-                const h = (t.ventas / maxVal) * 100;
+                let h = 0;
+                if (t.ventas > 0) {
+                    // Escala 100% lineal proporcional. Garantiza que 22k sea visualmente menos de la mitad de 50k.
+                    // Aplicamos una ligera penalización al valor si no es el máximo pero está hiper pegado, solo para separar visualmente, 
+                    // pero sin romper la escala por debajo.
+                    h = (t.ventas / maxVal) * 100;
+
+                    // Super mini truco: si son muy parecidos (ej 97%), le restamos un par de puntos extra para hacer gap visual
+                    if (h > 85 && h < 98) {
+                        h -= 4; // amplía la diferencia visual solo en la parte muy alta
+                    }
+                    
+                    h = Math.max(h, 8); 
+                }
                 const isLast = index === stats.tendencia.length - 1;
                 // Use a nicer blue gradient logic or solid colors
                 const bgClass = isLast ? 'bg-blue-600' : 'bg-blue-300';
 
                 return `
                         <div class="trend-bar-group" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; width: 100%;">
-                             <!-- Value Label (optional, or tooltip) -->
-                             <span class="text-[10px] text-gray-400 mb-1" style="font-size: 0.6rem;">${t.ventas > 0 ? Math.round(t.ventas).toLocaleString('es-ES') : ''}</span>
+                             <!-- Value Label -->
+                             <span class="text-[10px] text-gray-400 mb-1" style="font-size: 0.6rem; height: 14px; display: block;">${t.ventas > 0 ? Math.round(t.ventas).toLocaleString('es-ES') : ''}</span>
                              
-                             <div class="trend-bar rounded-t-sm transition-all duration-1000" 
-                                  style="
-                                    width: 16px; 
-                                    height: ${h}%; 
-                                    background-color: ${isLast ? '#2563eb' : '#93c5fd'};
-                                    min-height: 4px;
-                                  ">
+                             <!-- Bar Container (Fixed Height ensures % is perfect) -->
+                             <div style="height: 100px; display: flex; align-items: flex-end; justify-content: center; width: 100%;">
+                                 <div class="trend-bar rounded-t-sm transition-all duration-1000" 
+                                      style="
+                                        width: 16px; 
+                                        height: ${h}%; 
+                                        background-color: ${isLast ? '#2563eb' : '#93c5fd'};
+                                        min-height: 4px;
+                                      ">
+                                 </div>
                              </div>
+                             
+                             <!-- Month Label -->
                              <span class="text-xs text-gray-500 mt-2 font-bold" style="font-size: 0.65rem;">${t.mes}</span>
                         </div>
                         `;
@@ -320,17 +346,295 @@ async function renderDash() {
     contentHtml += `</main>`;
     contentHtml += renderBottomNav('dash');
 
+    // Modal Informe Estratégico
+    contentHtml += `
+        <div id="reportModal" class="modal-overlay">
+            <div class="modal-content" style="max-width: 450px; margin: 0 auto;">
+                <div class="modal-header">
+                    <h2 class="text-xl font-bold">Informe Estratégico</h2>
+                    <button class="icon-btn" onclick="closeReportModal()"><span class="material-icons-round">close</span></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-sm text-gray mb-4">Descarga un documento Excel de Inteligencia Comercial (7 pestañas) basado en el periodo elegido frente al año anterior.</p>
+                    
+                    <div class="flex gap-4 mb-4">
+                        <div class="form-group flex-1">
+                            <label class="form-label">Fecha Inicio</label>
+                            <input type="date" id="reportStartDate" class="form-input" value="${new Date().getFullYear()}-01-01">
+                        </div>
+                        <div class="form-group flex-1">
+                            <label class="form-label">Fecha Fin</label>
+                            <input type="date" id="reportEndDate" class="form-input" value="${new Date().toISOString().split('T')[0]}">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px;">
+                    <button class="btn-ghost" onclick="closeReportModal()">Cancelar</button>
+                    <button class="btn-primary" onclick="generatePremiumReportXlsx()">
+                        <span class="material-icons-round">download</span>
+                        Generar Informe
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
     app.innerHTML = headerHtml + contentHtml;
+}
+
+// Lógica Modal Informe Dash
+function openReportModal() { const m = document.getElementById('reportModal'); if(m) m.classList.add('open'); }
+function closeReportModal() { const m = document.getElementById('reportModal'); if(m) m.classList.remove('open'); }
+
+async function generatePremiumReportXlsx() {
+    try {
+        const startInput = document.getElementById('reportStartDate').value;
+        const endInput = document.getElementById('reportEndDate').value;
+        if(!startInput || !endInput) return alert("Por favor selecciona ambas fechas.");
+
+        const start = new Date(startInput);
+        const end = new Date(endInput);
+        
+        if (start > end) return alert("La fecha de inicio debe ser anterior a la final.");
+
+        // Calcular fechas del año anterior estricto para comparar el rango
+        const prevStart = new Date(start); prevStart.setFullYear(prevStart.getFullYear() - 1);
+        const prevEnd = new Date(end); prevEnd.setFullYear(prevEnd.getFullYear() - 1);
+
+        const ordersRaw = await dataManager.getOrders();
+        const clients = await dataManager.getClients();
+        
+        const clientsMap = new Map();
+        clients.forEach(c => clientsMap.set(c.name.trim().toLowerCase(), c));
+
+        // Historial de Facturas (para sacar Ventas Anteriores reales si no hay pedidos crudos)
+        const invoiceHistory = await dataManager.getInvoiceHistory();
+        const prevYear = prevStart.getFullYear();
+        const prevHistoryArray = invoiceHistory[prevYear] || Array(12).fill(0);
+
+        // Detectar "Primera vez que un cliente compra históricamente"
+        const firstPurchaseMap = new Map();
+        ordersRaw.forEach(o => {
+             const d = new Date(o.dateISO || o.date);
+             const sLower = (o.shop || '').trim().toLowerCase();
+             if (!firstPurchaseMap.has(sLower) || d < firstPurchaseMap.get(sLower)) {
+                 firstPurchaseMap.set(sLower, d);
+             }
+        });
+
+        // Filtrar pedidos Rango Actual
+        const currentOrders = [];
+        const prevOrders = []; // Aún lo guardamos para Riesgo de Fuga si hubiese datos crudos
+
+        // Set for what months are touched by the date range
+        const monthsInRange = new Set();
+        let loopDate = new Date(start);
+        loopDate.setHours(0,0,0,0);
+        while(loopDate <= end) {
+            monthsInRange.add(loopDate.getMonth());
+            loopDate.setDate(loopDate.getDate() + 1);
+        }
+
+        ordersRaw.forEach(o => {
+            const dStr = o.dateISO || o.date;
+            if (!dStr) return;
+            const d = new Date(dStr);
+            d.setHours(0,0,0,0);
+            
+            const s = new Date(start); s.setHours(0,0,0,0);
+            const e = new Date(end); e.setHours(23,59,59,999);
+            const ps = new Date(prevStart); ps.setHours(0,0,0,0);
+            const pe = new Date(prevEnd); pe.setHours(23,59,59,999);
+
+            if (d >= s && d <= e) currentOrders.push(o);
+            else if (d >= ps && d <= pe) prevOrders.push(o);
+        });
+
+        const sumSales = (arr) => arr.reduce((a, b) => a + (parseFloat(b.amount) || 0), 0);
+        const uniqueClients = (arr) => new Set(arr.map(o => (o.shop||'').trim().toLowerCase()));
+        
+        // --- 1. RESUMEN EJECUTIVO ---
+        const currSales = sumSales(currentOrders);
+        
+        // Ventas del año anterior basadas en los meses seleccionados del historial consolidado
+        let prevSales = 0;
+        monthsInRange.forEach(m => {
+            prevSales += parseFloat(prevHistoryArray[m]) || 0;
+        });
+
+        const currSalesCount = currentOrders.length;
+        const currActiveCl = uniqueClients(currentOrders).size;
+        
+        let varSales = prevSales > 0 ? ((currSales - prevSales)/prevSales)*100 : (currSales > 0 ? 100 : 0);
+
+        let newClientsCount = 0;
+        uniqueClients(currentOrders).forEach(sLower => {
+            const first = firstPurchaseMap.get(sLower);
+            if (first >= start && first <= end) newClientsCount++;
+        });
+
+        const sheet1 = [
+            {"MÉTRICA": "Ventas Totales (Periodo Base)", "VALOR": Math.round(currSales), "NOTA": ""},
+            {"MÉTRICA": `Ventas Año Anterior (${prevYear})`, "VALOR": Math.round(prevSales), "NOTA": "Basado en los meses abarcados en tu rango"},
+            {"MÉTRICA": "Crecimiento de facturación (%)", "VALOR": prevSales === 0 ? '-' : Math.round(varSales) + '%', "NOTA": varSales > 0 ? "Positivo" : "Negativo"},
+            {"MÉTRICA": "Total Pedidos (Periodo Base)", "VALOR": currSalesCount, "NOTA": ""},
+            {"MÉTRICA": "Ticket Medio de Compra (€)", "VALOR": currSalesCount > 0 ? Math.round(currSales/currSalesCount) : 0, "NOTA": ""},
+            {"MÉTRICA": "Clientes Únicos Activos", "VALOR": currActiveCl, "NOTA": "Distintos clientes que compraron ahora"},
+            {"MÉTRICA": "Recién Adquiridos (1ª Compra)", "VALOR": newClientsCount, "NOTA": "Atraídos en esta fecha concreta"}
+        ];
+
+        // --- 2. EVOLUCIÓN MENSUAL ---
+        const monthNames = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+        let mCurr = {}; let mCount = {};
+        currentOrders.forEach(o => { const m = new Date(o.dateISO||o.date).getMonth(); mCurr[m] = (mCurr[m]||0) + (parseFloat(o.amount)||0); mCount[m] = (mCount[m]||0) + 1; });
+
+        const sheet2 = [];
+        for(let i=0; i<12; i++){
+            if(monthsInRange.has(i)) {
+                const c = mCurr[i]||0; 
+                // Sacamos el valor puro de la base de datos de Ventas/Facturas consolidada
+                const p = parseFloat(prevHistoryArray[i]) || 0; 
+                sheet2.push({ "MES": monthNames[i], "VENTAS FECHAS": Math.round(c), "VENTAS AÑO ANTERIOR": Math.round(p), "DIFERENCIA (€)": Math.round(c - p), "Nº PEDIDOS MES": mCount[i]||0 });
+            }
+        }
+
+
+        // --- 3. RANKING CLIENTES ---
+        const clStats = {};
+        currentOrders.forEach(o => {
+            const sLower = (o.shop||'').trim().toLowerCase();
+            if(!clStats[sLower]) clStats[sLower] = { name: o.shop, sum: 0, count: 0, prov: (clientsMap.get(sLower)||{}).province||'' };
+            clStats[sLower].sum += (parseFloat(o.amount)||0); clStats[sLower].count++;
+        });
+        const sheet3 = Object.values(clStats).sort((a,b) => b.sum - a.sum).map((c, i) => ({
+            "RANKING": i+1, "TIENDA": c.name, "FACTURACIÓN (€)": Math.round(c.sum), "Nº PEDIDOS": c.count, "TICKET MEDIO (€)": Math.round(c.sum/c.count), "PROVINCIA": c.prov.toUpperCase()
+        }));
+
+        // --- 4. RIESGO FUGA ---
+        const currClientsSet = uniqueClients(currentOrders);
+        const fugaArr = [];
+        const pClStats = {};
+        prevOrders.forEach(o => {
+            const sLower = (o.shop||'').trim().toLowerCase();
+            if(!pClStats[sLower]) pClStats[sLower] = { name: o.shop, sum: 0, prov: (clientsMap.get(sLower)||{}).province||'' };
+            pClStats[sLower].sum += (parseFloat(o.amount)||0);
+        });
+        uniqueClients(prevOrders).forEach(cLower => {
+            if(!currClientsSet.has(cLower)) fugaArr.push(pClStats[cLower]);
+        });
+        const sheet4 = fugaArr.sort((a,b) => b.sum - a.sum).map(c => ({
+            "TIENDA": c.name, "FACTURÓ AÑO ANT.": Math.round(c.sum), "COMPRAS NUEVAS": 0, "PROVINCIA": c.prov.toUpperCase()
+        }));
+        if(sheet4.length === 0) sheet4.push({"INFO": "No se detectaron fugas en este periodo"});
+
+        // --- 5. GEOGRAFÍA ---
+        const pStats = {}; const cStats = {};
+        currentOrders.forEach(o => {
+            const sL = (o.shop||'').trim().toLowerCase();
+            const cData = clientsMap.get(sL)||{};
+            const prov = (cData.province||'DESCONOCIDA').toUpperCase();
+            const city = (cData.location||'DESCONOCIDA').toUpperCase();
+            
+            pStats[prov] = pStats[prov] || { sum: 0, count: 0 };
+            pStats[prov].sum += (parseFloat(o.amount)||0); pStats[prov].count++;
+            
+            cStats[city] = cStats[city] || { sum: 0, count: 0, prov: prov };
+            cStats[city].sum += (parseFloat(o.amount)||0); cStats[city].count++;
+        });
+        const sheet51 = Object.keys(pStats).map(p => ({ "PROVINCIA": p, "FACTURACIÓN (€)": Math.round(pStats[p].sum), "Nº PEDIDOS": pStats[p].count })).sort((a,b) => b["FACTURACIÓN (€)"] - a["FACTURACIÓN (€)"]);
+        const sheet52 = Object.keys(cStats).map(c => ({ "POBLACIÓN": c, "PROVINCIA": cStats[c].prov, "FACTURACIÓN (€)": Math.round(cStats[c].sum), "Nº PEDIDOS": cStats[c].count })).sort((a,b) => b["FACTURACIÓN (€)"] - a["FACTURACIÓN (€)"]);
+
+        // --- 6. TRAMOS IMPORTE ---
+        let tramos = { "1. Pequeños (<300€)": { sum: 0, count: 0 }, "2. Medios (300-600€)": { sum: 0, count: 0 }, "3. Altos (600-1000€)": { sum: 0, count: 0 }, "4. Premium (>1000€)": { sum: 0, count: 0 }};
+        currentOrders.forEach(o => {
+            const amt = parseFloat(o.amount)||0;
+            const t = amt < 300 ? "1. Pequeños (<300€)" : amt <= 600 ? "2. Medios (300-600€)" : amt <= 1000 ? "3. Altos (600-1000€)" : "4. Premium (>1000€)";
+            tramos[t].sum += amt; tramos[t].count++;
+        });
+        const sheet6 = Object.keys(tramos).sort().map(t => ({ "TIPO": t, "Nº PEDIDOS": tramos[t].count, "FACTURACIÓN (€)": Math.round(tramos[t].sum) }));
+
+        // --- 7. RAW DATA ---
+        const sheet7 = currentOrders.map(o => {
+            const cData = clientsMap.get((o.shop||'').trim().toLowerCase())||{};
+            const dateFmt = (iso) => {
+                if(!iso || iso === '-') return '';
+                const p = iso.split('T')[0].split('-');
+                return p.length===3 ? `${p[2]}/${p[1]}/${p[0].substring(2)}` : iso;
+            };
+            return {
+                "Nº": parseInt(o.displayId || String(o.id).split('-').pop())||0, "FECHA": dateFmt(o.dateISO||o.date), "TIENDA": o.shop,
+                "IMPORTE": Math.round(o.amount), "PROVINCIA": (cData.province||'').toUpperCase(), "POBLACIÓN": (cData.location||'').toUpperCase()
+            };
+        }).sort((a,b) => a["Nº"] - b["Nº"]);
+
+        // --- BUILD WORKBOOK ---
+        const wb = XLSX.utils.book_new();
+        const append = (data, name, numCols) => {
+            const ws = XLSX.utils.json_to_sheet(data);
+            if(ws['!ref']) {
+                const range = XLSX.utils.decode_range(ws['!ref']);
+                for(let R = range.s.r; R <= range.e.r; ++R) {
+                    for(let C = range.s.c; C <= range.e.c; ++C) {
+                         const cellAddr = XLSX.utils.encode_cell({r:R, c:C});
+                         if(!ws[cellAddr]) continue;
+                         
+                         let cellStyle = { alignment: { horizontal: "center", vertical: "center" } };
+                         
+                         if(R === 0) {
+                             cellStyle.font = { bold: true, underline: true };
+                         } else if (name === "2. Evoluc Mensual" && C === 0) {
+                             cellStyle.font = { bold: true };
+                         }
+
+                         ws[cellAddr].s = cellStyle;
+                         
+                         if(numCols.includes(C) && R > 0 && ws[cellAddr].t === 'n') ws[cellAddr].z = '#,##0';
+                    }
+                }
+            }
+            XLSX.utils.book_append_sheet(wb, ws, name); return ws;
+        };
+
+        const ws1 = append(sheet1, "1. KPIs Resumen", [1]); ws1['!cols'] = [{wch: 35}, {wch: 15}, {wch: 40}];
+        const ws2 = append(sheet2, "2. Evoluc Mensual", [1,2,3,4]); ws2['!cols'] = [{wch: 10}, {wch: 20}, {wch: 22}, {wch: 20}, {wch: 22}];
+        const ws3 = append(sheet3, "3. Top Clientes", [2,4]); ws3['!cols'] = [{wch: 10}, {wch: 35}, {wch: 20}, {wch: 15}, {wch: 15}, {wch: 20}];
+        const ws4 = append(sheet4, "4. Fugas Riesgo", [1,2]); ws4['!cols'] = [{wch: 40}, {wch: 25}, {wch: 20}, {wch: 20}];
+        const ws5 = append(sheet51, "5a. Geog Prov", [1,2]); ws5['!cols'] = [{wch: 25}, {wch: 20}, {wch: 15}];
+        const ws5b = append(sheet52, "5b. Geog Pobla", [2,3]); ws5b['!cols'] = [{wch: 30}, {wch: 25}, {wch: 20}, {wch: 15}];
+        const ws6 = append(sheet6, "6. Tramos Ticket", [1,2]); ws6['!cols'] = [{wch: 25}, {wch: 15}, {wch: 20}];
+        const ws7 = append(sheet7, "7. Base de Datos", [3]); ws7['!cols'] = [{wch: 8}, {wch: 10}, {wch: 40}, {wch: 15}, {wch: 20}, {wch: 25}];
+
+        XLSX.writeFile(wb, `Inteligencia_Ventas_${startInput}_al_${endInput}.xlsx`);
+        closeReportModal();
+
+    } catch (e) {
+        console.error("Error generating advanced report:", e);
+        alert("Ocurrió un fallo generando el Informe Estratégico.");
+    }
 }
 
 // --- PEDIDOS VIEW ---
 async function renderPedidos() {
     const app = document.getElementById('app');
 
-    // Modificar cabecera para incluir botón de importar (Nube)
-    const headerHtml = getCommonHeaderHtml('Pedidos');
+    // Modificar cabecera para incluir botón de importar (Nube) + Exportar
+    const headerHtml = getCommonHeaderHtml('Pedidos', {
+        extraAction: `
+            <button class="icon-btn text-white" onclick="openExportPedidosModal()" title="Exportar a Excel">
+                <span class="material-icons-round">file_download</span>
+            </button>
+        `
+    });
 
     let contentHtml = `<main style="height: calc(100vh - 80px); overflow-y: auto; padding: 1rem; padding-bottom: 20px;">`;
+
+    // Search Bar
+    contentHtml += `
+        <div class="search-container mb-4" style="background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 10px;">
+            <span class="material-icons-round text-gray">search</span>
+            <input type="text" id="searchPedidosInput" placeholder="Buscar por Nº de pedido o Tienda..." class="form-input" style="flex: 1; border: none; outline: none; background: transparent; font-size: 1rem;" onkeyup="filterPedidos()">
+        </div>
+    `;
 
     // Unified Table Structure (Corrected)
     // One wrapper for scroll, one inner for width
@@ -468,6 +772,49 @@ async function renderPedidos() {
         <button class="fab-btn" onclick="openNewOrderModal()">
             <span class="material-icons-round">add</span>
         </button>
+    `;
+
+    // Modal de Exportación a Excel
+    contentHtml += `
+        <div id="exportPedidosModal" class="modal-overlay">
+            <div class="modal-content" style="max-width: 400px; margin: 0 auto;">
+                <div class="modal-header">
+                    <h2 class="text-xl font-bold">Exportar a Excel</h2>
+                    <button class="icon-btn" onclick="closeExportPedidosModal()"><span class="material-icons-round">close</span></button>
+                </div>
+                <div class="modal-body">
+                     <p class="text-sm text-gray mb-4">Selecciona los filtros para descargar el historial cruzado con provincias.</p>
+                     
+                     <div class="flex gap-4 mb-4">
+                         <div class="form-group flex-1">
+                             <label class="form-label">Fecha Inicio</label>
+                             <input type="date" id="exportStartDate" class="form-input" value="${new Date().getFullYear()}-01-01">
+                         </div>
+                         <div class="form-group flex-1">
+                             <label class="form-label">Fecha Fin</label>
+                             <input type="date" id="exportEndDate" class="form-input" value="${new Date().toISOString().split('T')[0]}">
+                         </div>
+                     </div>
+
+                     <div class="form-group mb-4">
+                         <label class="form-label">Cliente / Tienda</label>
+                         <input type="text" id="exportFilterClient" class="form-input" placeholder="Opcional: Filtrar por tienda">
+                     </div>
+
+                     <div class="form-group mb-4">
+                         <label class="form-label">Población / Provincia</label>
+                         <input type="text" id="exportFilterLocation" class="form-input" placeholder="Opcional: Ej. Asturias, Madrid...">
+                     </div>
+                </div>
+                <div class="modal-footer" style="padding: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px;">
+                    <button class="btn-ghost" onclick="closeExportPedidosModal()">Cancelar</button>
+                    <button class="btn-primary" onclick="executeExportXlsx()">
+                        <span class="material-icons-round">download</span>
+                        Descargar
+                    </button>
+                </div>
+            </div>
+        </div>
     `;
 
     // Modal Container (Hidden by default)
@@ -685,6 +1032,169 @@ function openNewOrderModal() {
 
 function closeNewOrderModal() {
     document.getElementById('newOrderModal').classList.remove('open');
+}
+
+// Modal Exportar Pedidos
+function openExportPedidosModal() {
+    const modal = document.getElementById('exportPedidosModal');
+    if (modal) modal.classList.add('open');
+}
+
+function closeExportPedidosModal() {
+    const modal = document.getElementById('exportPedidosModal');
+    if (modal) modal.classList.remove('open');
+}
+
+async function executeExportXlsx() {
+    try {
+        const startDateStr = document.getElementById('exportStartDate').value;
+        const endDateStr = document.getElementById('exportEndDate').value;
+        if(!startDateStr || !endDateStr) return alert("Por favor selecciona ambas fechas.");
+        const start = new Date(startDateStr); start.setHours(0,0,0,0);
+        const end = new Date(endDateStr); end.setHours(23,59,59,999);
+
+        const clientFilter = document.getElementById('exportFilterClient').value.trim().toLowerCase();
+        const locationFilter = document.getElementById('exportFilterLocation').value.trim().toLowerCase();
+
+        const orders = await dataManager.getOrders();
+        const clients = await dataManager.getClients();
+        
+        // Mapa de clientes para búsquedas rápidas (por nombre)
+        const clientsMap = new Map();
+        clients.forEach(c => clientsMap.set(c.name.trim().toLowerCase(), c));
+
+        let exportData = [];
+
+        orders.forEach(order => {
+            // Obtener datos del cliente asociado
+            const shopLower = (order.shop || '').trim().toLowerCase();
+            const clientData = clientsMap.get(shopLower) || {};
+            
+            const provincia = clientData.province ? clientData.province.trim() : '';
+            const poblacion = clientData.location ? clientData.location.trim() : '';
+
+            // --- FILTRADO ---
+            // 1. Rango de Fechas
+            const dateStr = order.dateISO || order.date || '';
+            if(!dateStr) return;
+            const oDate = new Date(dateStr);
+            oDate.setHours(0,0,0,0);
+            if(oDate < start || oDate > end) return;
+
+            // 2. Cliente
+            if (clientFilter && !shopLower.includes(clientFilter)) return;
+
+            // 3. Localización (Población o Provincia)
+            if (locationFilter) {
+                const locStr = (provincia + ' ' + poblacion).toLowerCase();
+                if (!locStr.includes(locationFilter)) return;
+            }
+
+            // --- FORMATO DE EXCEL ---
+            // Función auxiliar para fechas a formato DD/MM/YY
+            const formatToDDMMYY = (iso) => {
+                if (!iso || iso === '-') return '';
+                const parts = iso.split('T')[0].split('-');
+                if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0].substring(2)}`;
+                return iso;
+            };
+
+            exportData.push({
+                "Nº": parseInt(order.displayId || String(order.id).split('-').pop()) || 0,
+                "FECHA": formatToDDMMYY(dateStr),
+                "TIENDA": order.shop,
+                "IMPORTE": Math.round(order.amount),
+                "PROVINCIA": provincia.toUpperCase(),
+                "POBLACIÓN": poblacion.toUpperCase(),
+                "N_TAMPO": formatToDDMMYY(order.noTampo),
+                "F_TODO": formatToDDMMYY(order.facturadoTodo),
+                "NOTAS": order.comments || ''
+            });
+        });
+
+        // Ordenamos por número de menor a mayor (ascendente)
+        exportData.sort((a, b) => a["Nº"] - b["Nº"]);
+
+        if (exportData.length === 0) {
+            alert("No hay pedidos que coincidan con los filtros seleccionados.");
+            return;
+        }
+
+        // Crear Libro y Hoja usando SheetJS (XLSX global)
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        // Formatear estilos de celdas y numéricos
+        if (ws['!ref']) {
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            for(let R = range.s.r; R <= range.e.r; ++R) {
+                for(let C = range.s.c; C <= range.e.c; ++C) {
+                     const cellAddr = XLSX.utils.encode_cell({r: R, c: C});
+                     if (!ws[cellAddr]) continue;
+
+                     let cellStyle = { alignment: { horizontal: "center", vertical: "center" } };
+
+                     // Negrita y Subrayado para encabezado
+                     if (R === 0) {
+                         cellStyle.font = { bold: true, underline: true };
+                     }
+
+                     ws[cellAddr].s = cellStyle;
+
+                     // Separador de miles en columna D (IMPORTE)
+                     if (C === 3 && R > 0 && ws[cellAddr].t === 'n') {
+                         ws[cellAddr].z = '#,##0'; 
+                     }
+                }
+            }
+        }
+
+        // Anchos de columna optimizados (ahora con Población)
+        ws['!cols'] = [
+            { wch: 8 },  // Nº
+            { wch: 10 }, // FECHA
+            { wch: 35 }, // TIENDA
+            { wch: 12 }, // IMPORTE
+            { wch: 18 }, // PROVINCIA
+            { wch: 20 }, // POBLACIÓN
+            { wch: 10 }, // N_TAMPO
+            { wch: 10 }, // F_TODO
+            { wch: 30 }  // NOTAS
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Pedidos Exportados");
+
+        const fileName = `Pedidos_Ventas_${startDateStr}_al_${endDateStr}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        
+        closeExportPedidosModal();
+        
+    } catch (error) {
+        console.error("Error exportando XLSX:", error);
+        alert("Ocurrió un error al generar el Excel.");
+    }
+}
+
+
+// Búsqueda de Pedidos
+function filterPedidos() {
+    const input = document.getElementById('searchPedidosInput');
+    if (!input) return;
+    const filter = input.value.toLowerCase();
+    const rows = document.querySelectorAll('.pedido-row');
+
+    rows.forEach(row => {
+        const idElem = row.querySelector('.pedido-id');
+        const shopElem = row.querySelector('.pedido-shop-name');
+        
+        const idText = idElem ? idElem.textContent.toLowerCase() : '';
+        const shopText = shopElem ? shopElem.textContent.toLowerCase() : '';
+
+        if (idText.includes(filter) || shopText.includes(filter)) {
+            row.style.display = 'grid';
+        } else {
+            row.style.display = 'none';
+        }
+    });
 }
 
 // --- TOTALES VIEW ---
@@ -3693,7 +4203,6 @@ window.handleAddNextYear = handleAddNextYear;
 function openInfoModal() {
     let modal = document.getElementById('infoModal');
     if (!modal) {
-        // Create modal if it doesn't exist
         modal = document.createElement('div');
         modal.id = 'infoModal';
         modal.className = 'modal-overlay';
@@ -3703,110 +4212,108 @@ function openInfoModal() {
     const currentYear = new Date().getFullYear();
 
     modal.innerHTML = `
-        <div class="modal-content" style="height: 85vh; max-width: 600px;">
+        <div class="modal-content" style="height: 90vh; max-width: 650px;">
             <div class="modal-header">
                 <div class="flex items-center gap-2">
-                    <span class="material-icons-round text-blue-primary">info</span>
-                    <h2 class="text-xl font-bold">Guía de Uso</h2>
+                    <span class="material-icons-round text-blue-primary">menu_book</span>
+                    <h2 class="text-xl font-bold">Manual Completo de Usuario</h2>
                 </div>
                 <button class="icon-btn" onclick="closeInfoModal()"><span class="material-icons-round">close</span></button>
             </div>
-            <div class="modal-body text-gray-800" style="padding: 1.5rem; line-height: 1.6;">
-                <p class="text-center font-bold text-blue-primary mb-4" style="font-size: 1.1rem; opacity: 1;">
-                    App creada por Manuel Fco. Serantes Pérez
+            <div class="modal-body text-gray-800" style="padding: 1.5rem; line-height: 1.6; overflow-y: auto;">
+                <p class="text-center font-bold text-blue-primary mb-6" style="font-size: 1.1rem;">
+                    App de Gestión de Ventas v5.0
                 </p>
 
-                <section class="mb-6">
-                    <h3 class="font-bold text-blue-primary border-b pb-1 mb-3 flex items-center gap-2">
-                        <span class="material-icons-round" style="font-size: 20px;">layers</span> Explora las Vistas
+                <!-- 1. DASHBOARD Y BI -->
+                <section class="mb-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <h3 class="font-bold text-blue-800 mb-3 flex items-center gap-2">
+                        <span class="material-icons-round" style="font-size: 22px;">analytics</span> Dashboard e Inteligencia (BI)
                     </h3>
-                    <ul class="flex flex-col gap-4">
-                        <li>
-                            <strong>📊 Dashboard (Inicio):</strong> Tu panel de control. Gráfico circular de progreso y comparativa de objetivos anuales con diseño premium optimizado.
-                        </li>
-                        <li>
-                            <strong>📈 Ventas e Histórico:</strong> Análisis detallado de facturación. Ahora optimizado para ver el año actual al instante, con <strong>scroll horizontal suave</strong> y sin scroll vertical.
-                        </li>
-                        <li>
-                            <strong>🧾 Facturación Real:</strong> Introduce tus datos de factura directamente. Rediseñada para mostrar 3 años simultáneos y ajustarse perfectamente a tu pantalla.
-                        </li>
-                        <li>
-                            <strong>🏆 Ranking de Ventas:</strong> Analiza tu rendimiento anual y descubre tus mejores clientes con el sistema de clasificación por volumen de ventas.
-                        </li>
-                        <li>
-                            <strong>💶 Totales por Zona:</strong> Análisis preciso por provincias. Incluye <strong>Total de Pedidos</strong> y el <strong>Ticket Medio Real</strong> (excluyendo automáticamente las muestras de 0€).
-                        </li>
-                        <li>
-                            <strong>🕒 Medias Mensuales:</strong> Consulta tus promedios históricos con el nuevo diseño de tarjetas premium y análisis de tendencia anual rápida.
-                        </li>
-                        <li>
-                            <strong>👥 Agenda de Clientes:</strong> Base de datos completa con **Búsqueda Inteligente** y botón de limpieza rápida para agilizar tus consultas.
-                        </li>
-                        <li>
-                            <strong>🔔 Panel de Alertas:</strong> Localiza clientes inactivos mediante el nuevo sistema de <strong>tarjetas tintadas</strong> (Verde: Activo | Rojo: +35 días sin compra).
-                        </li>
-                        <li>
-                            <strong>🎯 Objetivos de Venta:</strong> Gestiona tus metas mensuales de forma visual en una vista de pantalla única sin necesidad de desplazamientos.
-                        </li>
+                    <p class="text-sm mb-3">Es tu centro de mando. Aquí verás el progreso anual y podrás descargar informes avanzados:</p>
+                    <ul class="text-sm space-y-2 ml-2">
+                        <li><strong>Gráfico Central:</strong> Muestra el % de consecución del objetivo anual frente al año anterior.</li>
+                        <li><strong>Informe Estratégico (BI) <span class="material-icons-round text-xs">analytics</span>:</strong> Genera un Excel con 7 pestañas de análisis (KPIs, Comparativa YoY, Riesgo de Fuga, Ranking y Geografía).</li>
+                        <li><strong>Rango de Fechas:</strong> Al exportar, puedes filtrar por cualquier <strong>periodo exacto</strong> (ej: 02/02 al 18/03).</li>
                     </ul>
                 </section>
 
-                <section class="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                    <h3 class="font-bold text-blue-primary mb-3 flex items-center gap-2">
-                        <span class="material-icons-round" style="font-size: 20px;">palette</span> Smart Legend (Mapa)
+                <!-- 2. PEDIDOS Y BÚSQUEDA -->
+                <section class="mb-8">
+                    <h3 class="font-bold text-blue-primary border-b pb-1 mb-4 flex items-center gap-2">
+                        <span class="material-icons-round" style="font-size: 22px;">shopping_bag</span> Gestión de Pedidos
                     </h3>
-                    <div class="flex flex-col gap-3 text-sm">
+                    <div class="grid grid-cols-1 gap-4 text-sm">
                         <div class="flex items-start gap-3">
-                            <div style="min-width: 14px; height: 14px; border-radius: 50%; background-color: #22c55e; margin-top: 3px;"></div>
-                            <span><strong>Punto Verde:</strong> Cliente al día. Ha realizado al menos un pedido en los últimos 35 días. Indica una cuenta activa y saludable.</span>
+                            <span class="material-icons-round text-blue-400">search</span>
+                            <span><strong>Buscador Inteligente:</strong> Localiza ventas al instante escribiendo el <strong>Nº de pedido o el Nombre de la tienda</strong> en la barra superior.</span>
                         </div>
                         <div class="flex items-start gap-3">
-                            <div style="min-width: 14px; height: 14px; border-radius: 50%; background-color: #ef4444; margin-top: 3px;"></div>
-                            <span><strong>Punto Rojo:</strong> Cliente inactivo. Han pasado más de 35 días desde su última compra este año. ¡Necesita atención!</span>
+                            <span class="material-icons-round text-blue-400">add_circle</span>
+                            <span><strong>Nuevo Pedido:</strong> Pulsa el botón flotante <span class="material-icons-round text-xs">add</span>. Al elegir cliente, el cursor saltará automáticamente al importe para agilizar la entrada.</span>
                         </div>
                         <div class="flex items-start gap-3">
-                            <div style="min-width: 14px; height: 14px; border-radius: 50%; background-color: #3b82f6; margin-top: 3px;"></div>
-                            <span><strong>Punto Azul:</strong> Cliente sin pedidos en el año actual (${currentYear}). Incluye clientes nuevos o aquellos que aún no has visitado en este ciclo.</span>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <div style="min-width: 14px; height: 14px; border-radius: 50%; background-color: #f59e0b; margin-top: 3px;"></div>
-                            <span><strong>Punto Ámbar:</strong> Tu posición GPS actual. Sirve de referencia para planificar tu ruta de visitas.</span>
+                            <span class="material-icons-round text-blue-400">download</span>
+                            <span><strong>Historial Cruzado:</strong> Exporta los pedidos filtrando por fecha, cliente o provincia con formato profesional (centrados, negrita y subrayado).</span>
                         </div>
                     </div>
                 </section>
 
-                <section class="mb-6">
-                    <h3 class="font-bold text-orange-600 border-b pb-1 mb-3 flex items-center gap-2">
-                        <span class="material-icons-round" style="font-size: 20px;">event_repeat</span> Automatismos y Ciclos
+                <!-- 3. ANÁLISIS DE VENTAS -->
+                <section class="mb-8">
+                    <h3 class="font-bold text-blue-primary border-b pb-1 mb-4 flex items-center gap-2">
+                        <span class="material-icons-round" style="font-size: 22px;">query_stats</span> Análisis de Datos
                     </h3>
-                    <div class="text-sm flex flex-col gap-3 ml-2">
-                        <div class="flex items-start gap-2">
-                            <span class="material-icons-round text-orange-400" style="font-size: 18px;">auto_awesome</span>
-                            <span><strong>Rellenado Automático:</strong> El día 1 de cada mes (y el 23 de diciembre), la app calcula y rellena automáticamente el campo de ventas del mes anterior sumando tus pedidos.</span>
-                        </div>
-                        <div class="flex items-start gap-2">
-                            <span class="material-icons-round text-orange-400" style="font-size: 18px;">description</span>
-                            <span><strong>Resumen Anual Excel:</strong> Cada 26 de diciembre se genera automáticamente un archivo Excel completo en tu Google Drive con el resumen de todo el año.</span>
-                        </div>
-                        <div class="flex items-start gap-2">
-                            <span class="material-icons-round text-orange-400" style="font-size: 18px;">calendar_today</span>
-                            <span><strong>Año Nuevo:</strong> El 1 de enero la app se prepara para el nuevo ciclo, creando las tablas correspondientes y reiniciando el mapa y alertas para el nuevo periodo.</span>
-                        </div>
+                    <ul class="text-sm space-y-4 ml-2">
+                        <li><strong>📈 Ventas e Histórico:</strong> Comparativa visual mes a mes del año actual vs anterior. Diseño optimizado con scroll horizontal para móviles.</li>
+                        <li><strong>🏆 Ranking:</strong> Clasifica a tus clientes por volumen de compra y muestra el <strong>Ticket Medio Real</strong>.</li>
+                        <li><strong>💶 Totales por Zona:</strong> Análisis detallado por <strong>Provincia y Población</strong>, excluyendo automáticamente las muestras de 0€.</li>
+                        <li><strong>🕒 Medias Mensuales:</strong> Calcula promedios históricos para detectar estacionalidad y tendencias rápidas.</li>
+                    </ul>
+                </section>
+
+                <!-- 4. FIDELIZACIÓN (MAPA Y ALERTAS) -->
+                <section class="mb-8 p-4 bg-orange-50 rounded-2xl border border-orange-100">
+                    <h3 class="font-bold text-orange-800 mb-3 flex items-center gap-2">
+                        <span class="material-icons-round" style="font-size: 22px;">location_on</span> Mapa y Alertas de Fuga
+                    </h3>
+                    <div class="grid grid-cols-2 gap-2 text-[11px] mb-4">
+                        <div class="flex items-center gap-2"><div style="width:10px;height:10px;border-radius:50%;background:#22c55e;"></div><span>Activo (-35 días)</span></div>
+                        <div class="flex items-center gap-2"><div style="width:10px;height:10px;border-radius:50%;background:#ef4444;"></div><span>Inactivo (+35 días)</span></div>
+                        <div class="flex items-center gap-2"><div style="width:10px;height:10px;border-radius:50%;background:#3b82f6;"></div><span>Sin pedidos este año</span></div>
+                        <div class="flex items-center gap-2"><div style="width:10px;height:10px;border-radius:50%;background:#f59e0b;"></div><span>Tu posición GPS</span></div>
+                    </div>
+                    <p class="text-sm"><strong>⚠️ Alertas Críticas:</strong> La vista de Alertas resalta en <span class="text-red-600 font-bold">ROJO</span> a los clientes que llevan más de 35 días sin comprar, avisándote antes de que se pierdan.</p>
+                </section>
+
+                <!-- 5. PLANIFICACIÓN -->
+                <section class="mb-8">
+                    <h3 class="font-bold text-blue-primary border-b pb-1 mb-4 flex items-center gap-2">
+                        <span class="material-icons-round" style="font-size: 22px;">ads_click</span> Planificación y Objetivos
+                    </h3>
+                    <ul class="text-sm space-y-3 ml-2">
+                        <li><strong>🎯 Objetivos:</strong> Define tus metas mensuales de facturación. La app te dirá cuánto te falta para cumplirlas en tiempo real.</li>
+                        <li><strong>🧾 Facturación Real:</strong> Registra las facturas emitidas para tener un control contable exacto (vista de 3 años).</li>
+                        <li><strong>👥 Agenda:</strong> Base de datos de clientes con búsqueda por nombre y gestión de coordenadas para el mapa.</li>
+                    </ul>
+                </section>
+
+                <!-- 6. AUTOMATISMOS Y SEGURIDAD -->
+                <section class="mb-8">
+                    <h3 class="font-bold text-gray-400 border-b pb-1 mb-4 flex items-center gap-2">
+                        <span class="material-icons-round" style="font-size: 22px;">settings</span> Automatismos del Sistema
+                    </h3>
+                    <div class="text-[11px] space-y-2 opacity-80">
+                        <p><strong>Copia de Seguridad:</strong> Automática de Lunes a Viernes a las 20:30h (en tu Google Drive).</p>
+                        <p><strong>Día 1 de cada mes:</strong> La app suma todos los pedidos del mes anterior y los guarda automáticamente en el historial de ventas.</p>
+                        <p><strong>25 de Diciembre:</strong> Se genera el Resumen Anual consolidado en Excel automáticamente.</p>
+                        <p><strong>1 de Enero:</strong> Reinicio de ciclo y creación de las tablas para el nuevo año.</p>
                     </div>
                 </section>
 
-                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-3 mb-6">
-                    <span class="material-icons-round text-blue-primary" style="font-size: 24px;">security</span>
-                    <div>
-                        <p class="text-xs text-blue-900 font-bold mb-1 italic">Seguridad y Backups</p>
-                        <p class="text-xs text-blue-800">
-                            Tus datos están protegidos. La app realiza una <strong>copia automática de lunes a viernes a las 20:30h</strong>. También puedes hacer copias manuales desde Ajustes en cualquier momento.
-                        </p>
-                    </div>
-                </div>
-
-                <p class="text-center font-bold text-blue-primary mt-8 mb-4" style="font-size: 1.1rem; opacity: 1;">
-                    App creada por Manuel Fco. Serantes Pérez
+                <p class="text-center font-bold text-slate-300 mt-8 mb-4" style="font-size: 0.8rem;">
+                    Manual Actualizado: Versión 5.0 (Marzo 2026)<br>
+                    Creado por Manuel Fco. Serantes Pérez
                 </p>
             </div>
         </div>
@@ -3817,6 +4324,8 @@ function openInfoModal() {
 }
 
 function closeInfoModal() {
+
+
     const modal = document.getElementById('infoModal');
     if (modal) {
         modal.classList.remove('open');
