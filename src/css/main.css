@@ -781,3 +781,39 @@ body.no-scroll {
     transform: scale(0.95);
     background-color: #f1f5f9;
 }
+/* BOTÓN DE CABECERA TIPO PILL (CON TEXTO) */
+.btn-header-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    white-space: nowrap;
+}
+
+.btn-header-pill:active {
+    background: rgba(255, 255, 255, 0.35);
+    transform: scale(0.96);
+}
+
+.btn-header-pill .material-icons-round {
+    font-size: 20px;
+}
+
+@media (max-width: 420px) {
+    .btn-header-pill span:not(.material-icons-round) {
+        display: none;
+    }
+    .btn-header-pill {
+        padding: 8px;
+    }
+}

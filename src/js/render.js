@@ -39,8 +39,9 @@ async function renderDash() {
     const currentYear = new Date().getFullYear();
     const headerHtml = getCommonHeaderHtml('Dash', {
         extraAction: `
-            <button class="icon-btn text-white" onclick="openReportModal()" title="Generar Informe Estratégico">
+            <button class="btn-header-pill" onclick="openReportModal()" title="Generar Informe Estratégico">
                 <span class="material-icons-round">analytics</span>
+                <span>Informe Completo</span>
             </button>
         `
     });
@@ -614,8 +615,9 @@ async function renderPedidos() {
     // Modificar cabecera para incluir botón de importar (Nube) + Exportar
     const headerHtml = getCommonHeaderHtml('Pedidos', {
         extraAction: `
-            <button class="icon-btn text-white" onclick="openExportPedidosModal()" title="Exportar a Excel">
-                <span class="material-icons-round">file_download</span>
+            <button class="btn-header-pill" onclick="openExportPedidosModal()" title="Exportar a Excel">
+                <span class="material-icons-round">summarize</span>
+                <span>Informe Pedidos</span>
             </button>
         `
     });
