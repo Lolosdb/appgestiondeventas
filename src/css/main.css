@@ -291,11 +291,11 @@ body.no-scroll {
     /* To stick to the "Phone" view, we ideally want it inside the #app container at bottom */
     width: 100%;
     max-width: 480px;
-    /* Match app width */
     background-color: var(--primary-blue);
     display: flex;
     justify-content: space-around;
     padding: var(--spacing-sm) 0;
+    padding-bottom: calc(var(--spacing-sm) + 4px);
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
     z-index: 50;
     /* Center it */
@@ -321,7 +321,109 @@ body.no-scroll {
 }
 
 .nav-item .material-icons-round {
-    font-size: 24px;
+    font-size: 28px;
+}
+
+/* NAV MENU OVERLAY */
+.nav-menu-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 2000;
+    display: flex;
+    justify-content: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.nav-menu-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.nav-menu-content {
+    background-color: white;
+    width: 280px;
+    height: 100%;
+    box-shadow: -5px 0 25px rgba(0, 0, 0, 0.1);
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+}
+
+.nav-menu-overlay.open .nav-menu-content {
+    transform: translateX(0);
+}
+
+.nav-menu-header {
+    padding: 1.5rem;
+    background-color: var(--primary-blue);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-menu-body {
+    padding: 1rem 0;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.nav-menu-section {
+    padding: 0.75rem 1.5rem 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.nav-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1.5rem;
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: background-color 0.2s;
+    border: none;
+    background: none;
+    width: 100%;
+    cursor: pointer;
+}
+
+.nav-menu-item:active {
+    background-color: #f1f5f9;
+}
+
+.nav-menu-item .material-icons-round {
+    font-size: 22px;
+    color: var(--primary-blue);
+}
+
+.nav-menu-item span:not(.material-icons-round) {
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.nav-menu-footer {
+    padding: 1.5rem;
+    border-top: 1px solid #f1f5f9;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+/* UTILITIES */
+.no-scroll {
+    overflow: hidden;
 }
 
 /* Button & Icons */

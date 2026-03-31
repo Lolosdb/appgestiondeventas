@@ -16,17 +16,11 @@ function getCommonHeaderHtml(title, options = {}) {
                     ` : ''}
                     <h1 class="text-xl font-bold">${title}</h1>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-1">
                     ${extraAction}
-                    ${showSystemIcons ? `
-                        <div class="flex gap-2">
-                            <button class="icon-btn" onclick="renderVentas()"><span class="material-icons-round">trending_up</span></button>
-                            <button class="icon-btn" onclick="renderMedias()"><span class="material-icons-round">history</span></button>
-                            <button class="icon-btn" onclick="renderAjustes()"><span class="material-icons-round">settings</span></button>
-                            <button class="icon-btn" onclick="openRankingModal()"><span class="material-icons-round">emoji_events</span></button>
-                            <button class="icon-btn" onclick="openInfoModal()"><span class="material-icons-round" style="font-size: 24px; opacity: 0.9;">info_outline</span></button>
-                        </div>
-                    ` : ''}
+                    <button class="icon-btn" onclick="openNavMenu()" style="padding: 8px; margin-left: 4px;">
+                        <span class="material-icons-round" style="font-size: 28px;">menu</span>
+                    </button>
                 </div>
             </div>
         </header>
@@ -957,19 +951,111 @@ function renderBottomNav(activeTab) {
                 <span class="material-icons-round">notifications</span>
                 <span>Alertas</span>
              </a>
-             <a href="#" onclick="renderObjetivos()" class="nav-item ${activeTab === 'objetivos' ? 'active' : ''}">
-                <span class="material-icons-round">ads_click</span>
-                <span>Objetivos</span>
-             </a>
              <a href="#" onclick="renderMapa()" class="nav-item ${activeTab === 'mapa' ? 'active' : ''}">
                 <span class="material-icons-round">map</span>
                 <span>Mapa</span>
              </a>
-             <a href="#" onclick="renderFactura()" class="nav-item ${activeTab === 'factura' ? 'active' : ''}">
-                <span class="material-icons-round">receipt_long</span>
-                <span>Factura</span>
-             </a>
         </nav>
+    `;
+}
+
+// --- NAV MENU LOGIC ---
+function openNavMenu() {
+    let menuOverlay = document.getElementById('navMenuOverlay');
+    if (!menuOverlay) {
+        menuOverlay = document.createElement('div');
+        menuOverlay.id = 'navMenuOverlay';
+        menuOverlay.className = 'nav-menu-overlay';
+        menuOverlay.onclick = (e) => {
+            if (e.target.id === 'navMenuOverlay') closeNavMenu();
+        };
+        document.body.appendChild(menuOverlay);
+    }
+
+    menuOverlay.innerHTML = renderNavMenuHTML();
+    
+    // Trigger animation
+    setTimeout(() => {
+        menuOverlay.classList.add('open');
+        document.body.classList.add('no-scroll');
+    }, 10);
+}
+
+function closeNavMenu() {
+    const menuOverlay = document.getElementById('navMenuOverlay');
+    if (menuOverlay) {
+        menuOverlay.classList.remove('open');
+        document.body.classList.remove('no-scroll');
+    }
+}
+
+function renderNavMenuHTML() {
+    return `
+        <div class="nav-menu-content">
+            <div class="nav-menu-header">
+                <div class="flex items-center gap-2">
+                    <span class="material-icons-round">explore</span>
+                    <h2 class="font-bold text-lg">Más Opciones</h2>
+                </div>
+                <button class="icon-btn text-white" onclick="closeNavMenu()">
+                    <span class="material-icons-round">close</span>
+                </button>
+            </div>
+            
+            <div class="nav-menu-body">
+                <div class="nav-menu-section">Análisis</div>
+                <button class="nav-menu-item" onclick="closeNavMenu(); renderVentas();">
+                    <span class="material-icons-round">trending_up</span>
+                    <span>Análisis de Ventas</span>
+                </button>
+                <button class="nav-menu-item" onclick="closeNavMenu(); renderMedias();">
+                    <span class="material-icons-round">history_toggle_off</span>
+                    <span>Medias Mensuales</span>
+                </button>
+                <button class="nav-menu-item" onclick="closeNavMenu(); openRankingModal();">
+                    <span class="material-icons-round">emoji_events</span>
+                    <span>Ranking Clientes</span>
+                </button>
+
+                <div class="nav-menu-section">Planificación</div>
+                <button class="nav-menu-item" onclick="closeNavMenu(); renderObjetivos();">
+                    <span class="material-icons-round">ads_click</span>
+                    <span>Objetivos Mensuales</span>
+                </button>
+                <button class="nav-menu-item" onclick="closeNavMenu(); renderObjetivosTrimestrales();">
+                    <span class="material-icons-round">event_repeat</span>
+                    <span>Objetivos Trimestrales</span>
+                </button>
+
+                <div class="nav-menu-section">Control</div>
+                <button class="nav-menu-item" onclick="closeNavMenu(); renderFactura();">
+                    <span class="material-icons-round">receipt_long</span>
+                    <span>Facturación Real</span>
+                </button>
+
+                <div class="nav-menu-section">Sistema</div>
+                <button class="nav-menu-item" onclick="closeNavMenu(); renderAjustes();">
+                    <span class="material-icons-round">settings</span>
+                    <span>Ajustes y Sistema</span>
+                </button>
+                <button class="nav-menu-item" onclick="closeNavMenu(); initiateDriveBackup();">
+                    <span class="material-icons-round">cloud_upload</span>
+                    <span>Guardar en Drive</span>
+                </button>
+                <button class="nav-menu-item" onclick="closeNavMenu(); openBackupsModal();">
+                    <span class="material-icons-round">settings_backup_restore</span>
+                    <span>Ver Historico Copias</span>
+                </button>
+                <button class="nav-menu-item" onclick="closeNavMenu(); openInfoModal();">
+                    <span class="material-icons-round">info</span>
+                    <span>Manual de Usuario</span>
+                </button>
+            </div>
+
+            <div class="nav-menu-footer">
+                <p>App Ventas v5.0 marzo 2026</p>
+            </div>
+        </div>
     `;
 }
 
@@ -4588,3 +4674,5 @@ function closeRankingModal() {
 
 window.openRankingModal = openRankingModal;
 window.closeRankingModal = closeRankingModal;
+window.openNavMenu = openNavMenu;
+window.closeNavMenu = closeNavMenu;
