@@ -685,7 +685,7 @@ class DataManager {
         };
     }
     // --- YEARLY RANKING ---
-    async getYearlyRanking(year = new Date().getFullYear()) {
+    async getYearlyRanking(year = new Date().getFullYear(), sortBy = 'amount') {
         const orders = await this.getOrders();
 
         // 1. Filter orders for specified year
@@ -707,7 +707,16 @@ class DataManager {
         // 3. Convert to array and sort
         const ranking = Object.entries(clientStats)
             .map(([name, stats]) => ({ name, ...stats }))
-            .sort((a, b) => b.amount - a.amount)
+            .sort((a, b) => {
+                if (sortBy === 'orders') {
+                    // Mas pedidos primero. Si son iguales, mas importe primero.
+                    if (b.orderCount !== a.orderCount) return b.orderCount - a.orderCount;
+                    return b.amount - a.amount;
+                } else {
+                    // Mas importe primero.
+                    return b.amount - a.amount;
+                }
+            })
             .map((item, index) => ({ ...item, rank: index + 1 }));
 
         return ranking;

@@ -4337,7 +4337,7 @@ window.openInfoModal = openInfoModal;
 window.closeInfoModal = closeInfoModal;
 
 // --- RANKING MODAL ---
-async function openRankingModal() {
+async function openRankingModal(sortBy = 'amount') {
     let modal = document.getElementById('rankingModal');
     if (!modal) {
         modal = document.createElement('div');
@@ -4347,7 +4347,7 @@ async function openRankingModal() {
     }
 
     const currentYear = new Date().getFullYear();
-    const ranking = await dataManager.getYearlyRanking();
+    const ranking = await dataManager.getYearlyRanking(currentYear, sortBy);
 
     let rankingListHtml = '';
     if (ranking.length === 0) {
@@ -4379,14 +4379,68 @@ async function openRankingModal() {
     }
 
     modal.innerHTML = `
-        <div class="modal-content" style="height: 85vh; width: 95%; max-width: 450px; display: flex; flex-direction: column; margin: 0 auto;">
-            <div class="modal-header">
-                <div class="flex items-center gap-2">
-                    <span class="material-icons-round text-yellow-500">emoji_events</span>
-                    <h2 class="text-xl font-bold">Ranking Ventas ${currentYear}</h2>
+        <div class="modal-content" style="height: 85vh; width: 95%; max-width: 450px; display: flex; flex-direction: column; margin: 0 auto; border-radius: 24px 24px 0 0;">
+            <div class="modal-header" style="background: var(--primary-blue); color: white; border-bottom: none; padding: 1.25rem 1.15rem;">
+                <div class="flex items-center justify-between" style="width: 100%;">
+                    <div class="flex items-center gap-2">
+                        <span class="material-icons-round" style="color: #fbbf24; font-size: 28px;">emoji_events</span>
+                        <h1 class="text-xl font-bold" style="color: white; margin: 0;">Ranking ${currentYear}</h1>
+                    </div>
+                    <button class="flex items-center justify-center transition-all" 
+                            onclick="closeRankingModal()" 
+                            style="
+                                background: rgba(255, 255, 255, 0.2); 
+                                border: none; 
+                                border-radius: 12px; 
+                                width: 36px; 
+                                height: 36px; 
+                                color: white; 
+                                cursor: pointer;
+                                backdrop-filter: blur(4px);
+                            ">
+                        <span class="material-icons-round" style="font-size: 22px;">close</span>
+                    </button>
                 </div>
-                <button class="icon-btn" onclick="closeRankingModal()"><span class="material-icons-round">close</span></button>
             </div>
+            
+            <!-- Selectores de Ranking (Pestañas estilo Premium) -->
+            <div style="padding: 1rem; background: white; border-bottom: 1px solid #f1f5f9;">
+                <div class="flex" style="background: #f1f5f9; padding: 5px; border-radius: 16px; gap: 5px;">
+                    <button class="flex-1 transition-all" 
+                            style="
+                                padding: 12px; 
+                                border-radius: 12px; 
+                                border: none; 
+                                font-size: 14px; 
+                                font-weight: 700; 
+                                cursor: pointer;
+                                ${sortBy === 'amount' 
+                                    ? 'background: var(--primary-blue); color: white; box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.4);' 
+                                    : 'background: transparent; color: var(--text-secondary);'
+                                }
+                            "
+                            onclick="openRankingModal('amount')">
+                        Por Ventas
+                    </button>
+                    <button class="flex-1 transition-all" 
+                            style="
+                                padding: 12px; 
+                                border-radius: 12px; 
+                                border: none; 
+                                font-size: 14px; 
+                                font-weight: 700; 
+                                cursor: pointer;
+                                ${sortBy === 'orders' 
+                                    ? 'background: var(--primary-blue); color: white; box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.4);' 
+                                    : 'background: transparent; color: var(--text-secondary);'
+                                }
+                            "
+                            onclick="openRankingModal('orders')">
+                        Por Pedidos
+                    </button>
+                </div>
+            </div>
+
             <div class="modal-body bg-gray-50" style="padding: 1rem; flex: 1; overflow-y: auto;">
                 ${rankingListHtml}
             </div>
