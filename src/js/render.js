@@ -3298,6 +3298,25 @@ async function renderAjustes() {
                 Gestiona tus datos y la configuración del tiempo de la aplicación.
             </div>
 
+            <!-- Card Especial: Objetivos Trimestrales -->
+            <div class="settings-card" style="border-left: 5px solid #009ee3; background: linear-gradient(to right, #ffffff, #f0f9ff);">
+                <div class="card-header-row">
+                    <div class="icon-box-large bg-blue-light">
+                        <span class="material-icons-round" style="color: #009ee3;">ads_click</span>
+                    </div>
+                    <div>
+                        <h3 class="settings-card-title">Objetivos Trimestrales</h3>
+                        <p class="settings-card-desc">Configura los objetivos y el importe facturado para cada trimestre del año.</p>
+                    </div>
+                </div>
+                <div class="actions-row">
+                    <button class="btn-blue-light" onclick="renderObjetivosTrimestrales()">
+                        <span class="material-icons-round">edit</span>
+                        Configurar Objetivos
+                    </button>
+                </div>
+            </div>
+
             <!-- Card 1: Cloud Backups -->
             <div class="settings-card">
                 <div class="card-header-row">
@@ -3803,6 +3822,111 @@ async function deleteCurrentOrder() {
     }
 }
 
+async function renderObjetivosTrimestrales() {
+    const app = document.getElementById('app');
+    const headerHtml = getCommonHeaderHtml('Objetivos Trimestrales', { showBack: true, backFn: 'renderAjustes()' });
+
+    const goals = await dataManager.getQuarterlyGoals();
+
+    let contentHtml = `<main class="trim-container">`;
+
+    contentHtml += `
+        <div class="trim-card">
+            <div class="trim-header">
+                <span>Trimestre</span>
+                <span>Objetivo</span>
+                <span>Facturado</span>
+                <span>Estado</span>
+            </div>
+            <div class="trim-body">
+    `;
+
+    const labels = ["1er Trimestre", "2º Trimestre", "3er Trimestre", "4º Trimestre"];
+    const keys = ["q1", "q2", "q3", "q4"];
+
+    keys.forEach((key, index) => {
+        const goal = goals[key].target || 0;
+        const actual = goals[key].actual || 0;
+        const diff = actual - goal;
+        let statusText = "";
+        let statusClass = "";
+
+        if (actual > 0) {
+            statusText = diff >= 0 ? "Conseguido" : `-${Math.round(Math.abs(diff)).toLocaleString('es-ES')}€`;
+            statusClass = diff >= 0 ? "status-success" : "status-danger";
+        }
+
+        contentHtml += `
+            <div class="trim-row">
+                <span class="trim-label">${labels[index]}</span>
+                <div class="trim-input-wrapper">
+                    <input type="text" inputmode="numeric" class="trim-input" data-key="${key}" data-type="target" 
+                           value="${goal === 0 ? '' : Math.round(goal).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}" 
+                           placeholder="0 €">
+                </div>
+                <div class="trim-input-wrapper">
+                    <input type="text" inputmode="numeric" class="trim-input" data-key="${key}" data-type="actual" 
+                           value="${actual === 0 ? '' : Math.round(actual).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}" 
+                           placeholder="0 €">
+                </div>
+                <div class="trim-status ${statusClass}">${statusText}</div>
+            </div>
+        `;
+    });
+
+    contentHtml += `
+            </div>
+        </div>
+        <div class="trim-save-container">
+            <button class="btn-trim-save" onclick="saveQuarterlyGoalsUI()">
+                <span class="material-icons-round">save</span>
+                Guardar Cambios
+            </button>
+        </div>
+    </main>`;
+
+    contentHtml += renderBottomNav(null);
+    app.innerHTML = headerHtml + contentHtml;
+
+    // Navigation setup
+    setupGridNavigation('.trim-body', '.trim-input');
+    
+    // Auto-format thousands
+    document.querySelectorAll('.trim-input').forEach(input => {
+        input.addEventListener('input', (e) => {
+            let val = e.target.value.replace(/\D/g, '');
+            if (val) {
+                e.target.value = parseInt(val).toLocaleString('es-ES');
+            }
+        });
+    });
+}
+
+async function saveQuarterlyGoalsUI() {
+    const inputs = document.querySelectorAll('.trim-input');
+    const goals = {
+        q1: { target: 0, actual: 0 },
+        q2: { target: 0, actual: 0 },
+        q3: { target: 0, actual: 0 },
+        q4: { target: 0, actual: 0 }
+    };
+
+    inputs.forEach(input => {
+        const key = input.dataset.key;
+        const type = input.dataset.type;
+        const val = input.value.replace(/\./g, '').replace(',', '.');
+        goals[key][type] = Math.round(parseFloat(val)) || 0;
+    });
+
+    try {
+        await dataManager.saveQuarterlyGoals(goals);
+        alert("¡Objetivos guardados correctamente!");
+        renderObjetivosTrimestrales();
+    } catch (e) {
+        alert("Error al guardar: " + e.message);
+    }
+}
+
 // Make functions global
 window.renderDash = renderDash;
 window.renderPedidos = renderPedidos;
@@ -3810,6 +3934,9 @@ window.renderTotales = renderTotales;
 window.renderClientes = renderClientes;
 window.renderAlertas = renderAlertas;
 window.renderObjetivos = renderObjetivos;
+window.renderObjetivosTrimestrales = renderObjetivosTrimestrales;
+window.saveQuarterlyGoalsUI = saveQuarterlyGoalsUI;
+
 window.renderMapa = renderMapa;
 window.renderFactura = renderFactura;
 window.renderVentas = renderVentas;

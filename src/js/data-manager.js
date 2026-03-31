@@ -64,6 +64,24 @@ class DataManager {
         await this.db.put('config', { key: 'goals', ...goalsData });
     }
 
+    // --- QUARTERLY GOALS (OBJETIVOS TRIMESTRALES) ---
+    async getQuarterlyGoals() {
+        const stored = await this.db.get('config', 'quarterly_goals');
+        if (stored) return stored.data;
+
+        // Default empty structure
+        return {
+            q1: { target: 0, actual: 0 },
+            q2: { target: 0, actual: 0 },
+            q3: { target: 0, actual: 0 },
+            q4: { target: 0, actual: 0 }
+        };
+    }
+
+    async saveQuarterlyGoals(goalsData) {
+        await this.db.put('config', { key: 'quarterly_goals', data: goalsData });
+    }
+
     // --- DEPARTAMENTOS ---
     async getDepartamentos() {
         return await this.db.getAll('departments');

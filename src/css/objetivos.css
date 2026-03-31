@@ -160,3 +160,116 @@
     font-size: 1rem;
     font-weight: 900;
 }
+
+/* Quarterly Goals Specific Styles */
+.trim-container {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-bottom: 100px;
+}
+
+.trim-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.25rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e2e8f0;
+}
+
+.trim-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #f1f5f9;
+    margin-bottom: 0.5rem;
+    font-weight: 800;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    color: #94a3b8;
+    text-align: center;
+}
+
+.trim-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.trim-row:last-child {
+    border-bottom: none;
+}
+
+.trim-label {
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 0.85rem;
+}
+
+.trim-input {
+    width: 100%;
+    padding: 6px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    text-align: right;
+    font-weight: 700;
+    font-family: inherit;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.trim-input:focus {
+    outline: none;
+    border-color: #009ee3;
+    background-color: #f0f9ff;
+}
+
+.trim-status {
+    text-align: center;
+    font-weight: 800;
+    font-size: 0.65rem;
+    padding: 4px 2px;
+    border-radius: 6px;
+    word-break: break-all;
+}
+
+.status-success {
+    background-color: #dcfce7;
+    color: #16a34a;
+}
+
+.status-danger {
+    background-color: #fee2e2;
+    color: #ef4444;
+}
+
+.trim-save-container {
+    position: fixed;
+    bottom: 90px;
+    left: 0;
+    right: 0;
+    padding: 1rem;
+    display: flex;
+    justify-content: center;
+    z-index: 100;
+}
+
+.btn-trim-save {
+    background-color: #009ee3;
+    color: white;
+    border: none;
+    padding: 0.75rem 2.5rem;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0, 158, 227, 0.4);
+    cursor: pointer;
+}
